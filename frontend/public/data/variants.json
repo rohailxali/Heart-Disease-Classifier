@@ -1,0 +1,186 @@
+{
+  "variant_a_dnn_early_stopping": {
+    "title": "Variant A: DNN Early Stopping & Loss-Based Tuning",
+    "description": "Applies tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True) and selects hyperparameter config by minimum validation loss instead of final-epoch accuracy.",
+    "hypothesis": "Eliminates catastrophic overfitting observed in Seed 44 (where val loss spiked from 0.32 to 1.56), stabilizing cross-seed variance.",
+    "status": "Documented protocol (TensorFlow required for execution)"
+  },
+  "variant_b_median_imputation": {
+    "title": "Variant B: Median Imputation of Zero Measurements",
+    "description": "Replaces zero values in Cholesterol (172 rows) and RestingBP (1 row) with NaN and applies SimpleImputer(strategy='median') strictly fit inside training folds to prevent data leakage.",
+    "hypothesis": "Removes the artificial proxy shortcut where models exploit Cholesterol==0 as an indicator of 88.4% disease prevalence, measuring true physiological generalization.",
+    "models": {
+      "NB": {
+        "accuracy": {
+          "mean": 0.8522,
+          "std": 0.0165
+        },
+        "precision0": {
+          "mean": 0.8247,
+          "std": 0.0141
+        },
+        "precision1": {
+          "mean": 0.876,
+          "std": 0.0238
+        },
+        "recall0": {
+          "mean": 0.8488,
+          "std": 0.0329
+        },
+        "recall1": {
+          "mean": 0.8549,
+          "std": 0.0128
+        },
+        "f1_0": {
+          "mean": 0.8363,
+          "std": 0.0202
+        },
+        "f1_1": {
+          "mean": 0.8652,
+          "std": 0.0139
+        },
+        "auc": {
+          "mean": 0.9138,
+          "std": 0.0101
+        }
+      },
+      "DT": {
+        "accuracy": {
+          "mean": 0.8326,
+          "std": 0.0178
+        },
+        "precision0": {
+          "mean": 0.8153,
+          "std": 0.0354
+        },
+        "precision1": {
+          "mean": 0.8481,
+          "std": 0.0175
+        },
+        "recall0": {
+          "mean": 0.8098,
+          "std": 0.0281
+        },
+        "recall1": {
+          "mean": 0.851,
+          "std": 0.0369
+        },
+        "f1_0": {
+          "mean": 0.8118,
+          "std": 0.0176
+        },
+        "f1_1": {
+          "mean": 0.8491,
+          "std": 0.0183
+        },
+        "auc": {
+          "mean": 0.9027,
+          "std": 0.0186
+        }
+      },
+      "RF": {
+        "accuracy": {
+          "mean": 0.8652,
+          "std": 0.0178
+        },
+        "precision0": {
+          "mean": 0.8724,
+          "std": 0.0181
+        },
+        "precision1": {
+          "mean": 0.8604,
+          "std": 0.0207
+        },
+        "recall0": {
+          "mean": 0.8171,
+          "std": 0.0311
+        },
+        "recall1": {
+          "mean": 0.9039,
+          "std": 0.0145
+        },
+        "f1_0": {
+          "mean": 0.8437,
+          "std": 0.0222
+        },
+        "f1_1": {
+          "mean": 0.8815,
+          "std": 0.0149
+        },
+        "auc": {
+          "mean": 0.9266,
+          "std": 0.0085
+        }
+      },
+      "SVM": {
+        "accuracy": {
+          "mean": 0.862,
+          "std": 0.0062
+        },
+        "precision0": {
+          "mean": 0.8606,
+          "std": 0.0129
+        },
+        "precision1": {
+          "mean": 0.864,
+          "std": 0.0192
+        },
+        "recall0": {
+          "mean": 0.8244,
+          "std": 0.0318
+        },
+        "recall1": {
+          "mean": 0.8922,
+          "std": 0.0155
+        },
+        "f1_0": {
+          "mean": 0.8416,
+          "std": 0.0111
+        },
+        "f1_1": {
+          "mean": 0.8776,
+          "std": 0.0034
+        },
+        "auc": {
+          "mean": 0.9294,
+          "std": 0.0115
+        }
+      },
+      "LR": {
+        "accuracy": {
+          "mean": 0.8685,
+          "std": 0.019
+        },
+        "precision0": {
+          "mean": 0.8592,
+          "std": 0.0285
+        },
+        "precision1": {
+          "mean": 0.8763,
+          "std": 0.016
+        },
+        "recall0": {
+          "mean": 0.8439,
+          "std": 0.0218
+        },
+        "recall1": {
+          "mean": 0.8882,
+          "std": 0.0265
+        },
+        "f1_0": {
+          "mean": 0.8512,
+          "std": 0.0204
+        },
+        "f1_1": {
+          "mean": 0.8821,
+          "std": 0.0179
+        },
+        "auc": {
+          "mean": 0.9267,
+          "std": 0.0131
+        }
+      }
+    },
+    "status": "Executed across all 5 seeds"
+  }
+}

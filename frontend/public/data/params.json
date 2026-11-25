@@ -1,0 +1,194 @@
+{
+  "NB": [
+    {
+      "seed": 42,
+      "model": "NB",
+      "var_smoothing": 1e-09
+    },
+    {
+      "seed": 43,
+      "model": "NB",
+      "var_smoothing": 1e-09
+    },
+    {
+      "seed": 44,
+      "model": "NB",
+      "var_smoothing": 1e-09
+    },
+    {
+      "seed": 45,
+      "model": "NB",
+      "var_smoothing": 1e-09
+    },
+    {
+      "seed": 46,
+      "model": "NB",
+      "var_smoothing": 1e-09
+    }
+  ],
+  "DT": [
+    {
+      "seed": 42,
+      "model": "DT",
+      "max_depth": 3.0,
+      "min_samples_split": 2.0
+    },
+    {
+      "seed": 43,
+      "model": "DT",
+      "max_depth": 5.0,
+      "min_samples_split": 10.0
+    },
+    {
+      "seed": 44,
+      "model": "DT",
+      "max_depth": 3.0,
+      "min_samples_split": 2.0
+    },
+    {
+      "seed": 45,
+      "model": "DT",
+      "max_depth": 5.0,
+      "min_samples_split": 10.0
+    },
+    {
+      "seed": 46,
+      "model": "DT",
+      "max_depth": 3.0,
+      "min_samples_split": 2.0
+    }
+  ],
+  "RF": [
+    {
+      "seed": 42,
+      "model": "RF",
+      "max_features": "sqrt",
+      "n_estimators": 100.0
+    },
+    {
+      "seed": 43,
+      "model": "RF",
+      "max_features": "sqrt",
+      "n_estimators": 300.0
+    },
+    {
+      "seed": 44,
+      "model": "RF",
+      "max_features": "sqrt",
+      "n_estimators": 300.0
+    },
+    {
+      "seed": 45,
+      "model": "RF",
+      "max_features": "sqrt",
+      "n_estimators": 200.0
+    },
+    {
+      "seed": 46,
+      "model": "RF",
+      "max_features": "sqrt",
+      "n_estimators": 300.0
+    }
+  ],
+  "SVM": [
+    {
+      "seed": 42,
+      "model": "SVM",
+      "C": 1.0,
+      "kernel": "rbf"
+    },
+    {
+      "seed": 43,
+      "model": "SVM",
+      "C": 0.1,
+      "kernel": "linear"
+    },
+    {
+      "seed": 44,
+      "model": "SVM",
+      "C": 1.0,
+      "kernel": "rbf"
+    },
+    {
+      "seed": 45,
+      "model": "SVM",
+      "C": 1.0,
+      "kernel": "rbf"
+    },
+    {
+      "seed": 46,
+      "model": "SVM",
+      "C": 1.0,
+      "kernel": "rbf"
+    }
+  ],
+  "LR": [
+    {
+      "seed": 42,
+      "model": "LR",
+      "C": 0.1,
+      "solver": "liblinear"
+    },
+    {
+      "seed": 43,
+      "model": "LR",
+      "C": 0.1,
+      "solver": "liblinear"
+    },
+    {
+      "seed": 44,
+      "model": "LR",
+      "C": 0.1,
+      "solver": "saga"
+    },
+    {
+      "seed": 45,
+      "model": "LR",
+      "C": 0.1,
+      "solver": "liblinear"
+    },
+    {
+      "seed": 46,
+      "model": "LR",
+      "C": 0.1,
+      "solver": "liblinear"
+    }
+  ],
+  "DNN": [
+    {
+      "seed": 42,
+      "model": "DNN",
+      "batch": 32.0,
+      "lr": 0.001,
+      "epochs": 20.0
+    },
+    {
+      "seed": 43,
+      "model": "DNN",
+      "batch": 16.0,
+      "lr": 0.001,
+      "epochs": 20.0
+    },
+    {
+      "seed": 44,
+      "model": "DNN",
+      "batch": 16.0,
+      "lr": 0.01,
+      "epochs": 50.0
+    },
+    {
+      "seed": 45,
+      "model": "DNN",
+      "batch": 32.0,
+      "lr": 0.001,
+      "epochs": 20.0
+    },
+    {
+      "seed": 46,
+      "model": "DNN",
+      "batch": 16.0,
+      "lr": 0.001,
+      "epochs": 20.0
+    }
+  ]
+}

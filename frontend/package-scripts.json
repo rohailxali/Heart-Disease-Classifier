@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "api": "cd .. && python -m uvicorn api.main:app --reload --port 8000"
+  }
+}

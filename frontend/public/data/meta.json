@@ -1,0 +1,52 @@
+{
+  "paper": {
+    "title": "A Comparative Study of ML and DL Models for Heart Disease Classification",
+    "authors": "Simanjuntak, Robet & Hoki",
+    "journal": "JAIC",
+    "volume": 9,
+    "issue": 6,
+    "year": 2025,
+    "pages": "3405-3409"
+  },
+  "dataset": {
+    "source": "Kaggle Heart Failure Prediction Dataset",
+    "rows": 918,
+    "columns": 12,
+    "features": [
+      "Age",
+      "Sex",
+      "ChestPainType",
+      "RestingBP",
+      "Cholesterol",
+      "FastingBS",
+      "RestingECG",
+      "MaxHR",
+      "ExerciseAngina",
+      "Oldpeak",
+      "ST_Slope"
+    ],
+    "target": "HeartDisease"
+  },
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "split": {
+    "train": 734,
+    "test": 184,
+    "disease_in_test": 102,
+    "healthy_in_test": 82
+  },
+  "one_patient_pct": 0.5435,
+  "generated_at": "2026-11-24T17:08:16.907998+00:00",
+  "library_versions": {
+    "python": "3.12.10",
+    "pandas": "3.0.2",
+    "numpy": "1.26.4",
+    "sklearn": "1.8.0",
+    "tensorflow": "unavailable"
+  }
+}

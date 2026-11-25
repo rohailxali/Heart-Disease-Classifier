@@ -1,0 +1,57 @@
+[
+  {
+    "id": "scoring",
+    "source": "assumption",
+    "text": "Grid-search scoring metric is accuracy. The paper does not specify it explicitly."
+  },
+  {
+    "id": "dnn_widths",
+    "source": "assumption",
+    "text": "DNN hidden layer widths are 64-32-16. The paper mentions '3 hidden layers' without specifying sizes."
+  },
+  {
+    "id": "nb_grid",
+    "source": "assumption",
+    "text": "Na\u00efve Bayes var_smoothing grid is [1e-9, 1e-8, 1e-7]. The paper says 'smoothing parameters' without values."
+  },
+  {
+    "id": "dnn_val",
+    "source": "assumption",
+    "text": "DNN is tuned on a 20% validation split of the training set, with config selected by last-epoch validation accuracy (no early stopping). The paper says 'validation split' without further detail."
+  },
+  {
+    "id": "zeros_kept",
+    "source": "paper",
+    "text": "Zero values in Cholesterol (172 rows) and RestingBP (1 row) are kept as-is to match the paper-faithful run."
+  },
+  {
+    "id": "split",
+    "source": "paper",
+    "text": "80:20 stratified train-test split, 5-fold stratified cross-validation."
+  },
+  {
+    "id": "dt_grid",
+    "source": "paper",
+    "text": "Decision Tree grid: max_depth \u2208 {3,5,7,None}, min_samples_split \u2208 {2,5,10}."
+  },
+  {
+    "id": "rf_grid",
+    "source": "paper",
+    "text": "Random Forest grid: n_estimators \u2208 {100,200,300}, max_features \u2208 {sqrt, log2}."
+  },
+  {
+    "id": "svm_grid",
+    "source": "paper",
+    "text": "SVM grid: C \u2208 {0.1,1,10}, kernel \u2208 {linear, rbf}."
+  },
+  {
+    "id": "lr_grid",
+    "source": "paper",
+    "text": "Logistic Regression grid: solver \u2208 {liblinear, saga}, C \u2208 {0.1,1,10}."
+  },
+  {
+    "id": "dnn_grid",
+    "source": "paper",
+    "text": "DNN grid: batch \u2208 {16,32}, lr \u2208 {0.001,0.01}, epochs \u2208 {20,50}. Architecture: Adam optimizer, binary cross-entropy loss."
+  }
+]

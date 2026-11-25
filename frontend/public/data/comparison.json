@@ -1,0 +1,482 @@
+[
+  {
+    "model": "NB",
+    "metric": "accuracy",
+    "paper": 0.86,
+    "mine": 0.86087,
+    "std": 0.017442,
+    "diff": 0.00087,
+    "z": 0.0499,
+    "verdict": "within noise"
+  },
+  {
+    "model": "NB",
+    "metric": "precision0",
+    "paper": 0.8,
+    "mine": 0.840856,
+    "std": 0.023842,
+    "diff": 0.040856,
+    "z": 1.7136,
+    "verdict": "higher"
+  },
+  {
+    "model": "NB",
+    "metric": "precision1",
+    "paper": 0.93,
+    "mine": 0.877437,
+    "std": 0.013442,
+    "diff": -0.052563,
+    "z": -3.9104,
+    "verdict": "lower"
+  },
+  {
+    "model": "NB",
+    "metric": "recall0",
+    "paper": 0.91,
+    "mine": 0.84878,
+    "std": 0.016361,
+    "diff": -0.06122,
+    "z": -3.7418,
+    "verdict": "lower"
+  },
+  {
+    "model": "NB",
+    "metric": "recall1",
+    "paper": 0.88,
+    "mine": 0.870588,
+    "std": 0.021254,
+    "diff": -0.009412,
+    "z": -0.4428,
+    "verdict": "within noise"
+  },
+  {
+    "model": "NB",
+    "metric": "f1_0",
+    "paper": 0.85,
+    "mine": 0.844733,
+    "std": 0.018714,
+    "diff": -0.005267,
+    "z": -0.2814,
+    "verdict": "within noise"
+  },
+  {
+    "model": "NB",
+    "metric": "f1_1",
+    "paper": 0.88,
+    "mine": 0.873953,
+    "std": 0.016353,
+    "diff": -0.006047,
+    "z": -0.3698,
+    "verdict": "within noise"
+  },
+  {
+    "model": "NB",
+    "metric": "auc",
+    "paper": 0.92,
+    "mine": 0.917456,
+    "std": 0.010737,
+    "diff": -0.002544,
+    "z": -0.2369,
+    "verdict": "within noise"
+  },
+  {
+    "model": "DT",
+    "metric": "accuracy",
+    "paper": 0.79,
+    "mine": 0.833696,
+    "std": 0.022605,
+    "diff": 0.043696,
+    "z": 1.933,
+    "verdict": "higher"
+  },
+  {
+    "model": "DT",
+    "metric": "precision0",
+    "paper": 0.71,
+    "mine": 0.798906,
+    "std": 0.031055,
+    "diff": 0.088906,
+    "z": 2.8629,
+    "verdict": "higher"
+  },
+  {
+    "model": "DT",
+    "metric": "precision1",
+    "paper": 0.88,
+    "mine": 0.86519,
+    "std": 0.020393,
+    "diff": -0.01481,
+    "z": -0.7262,
+    "verdict": "within noise"
+  },
+  {
+    "model": "DT",
+    "metric": "recall0",
+    "paper": 0.86,
+    "mine": 0.839024,
+    "std": 0.026438,
+    "diff": -0.020976,
+    "z": -0.7934,
+    "verdict": "within noise"
+  },
+  {
+    "model": "DT",
+    "metric": "recall1",
+    "paper": 0.75,
+    "mine": 0.829412,
+    "std": 0.032219,
+    "diff": 0.079412,
+    "z": 2.4648,
+    "verdict": "higher"
+  },
+  {
+    "model": "DT",
+    "metric": "f1_0",
+    "paper": 0.78,
+    "mine": 0.818174,
+    "std": 0.023254,
+    "diff": 0.038174,
+    "z": 1.6416,
+    "verdict": "higher"
+  },
+  {
+    "model": "DT",
+    "metric": "f1_1",
+    "paper": 0.81,
+    "mine": 0.846681,
+    "std": 0.022253,
+    "diff": 0.036681,
+    "z": 1.6484,
+    "verdict": "higher"
+  },
+  {
+    "model": "DT",
+    "metric": "auc",
+    "paper": 0.8,
+    "mine": 0.89951,
+    "std": 0.029274,
+    "diff": 0.09951,
+    "z": 3.3993,
+    "verdict": "higher"
+  },
+  {
+    "model": "RF",
+    "metric": "accuracy",
+    "paper": 0.88,
+    "mine": 0.868478,
+    "std": 0.025317,
+    "diff": -0.011522,
+    "z": -0.4551,
+    "verdict": "within noise"
+  },
+  {
+    "model": "RF",
+    "metric": "precision0",
+    "paper": 0.84,
+    "mine": 0.879165,
+    "std": 0.027413,
+    "diff": 0.039165,
+    "z": 1.4287,
+    "verdict": "higher"
+  },
+  {
+    "model": "RF",
+    "metric": "precision1",
+    "paper": 0.9,
+    "mine": 0.861129,
+    "std": 0.025358,
+    "diff": -0.038871,
+    "z": -1.5329,
+    "verdict": "lower"
+  },
+  {
+    "model": "RF",
+    "metric": "recall0",
+    "paper": 0.87,
+    "mine": 0.817073,
+    "std": 0.036585,
+    "diff": -0.052927,
+    "z": -1.4467,
+    "verdict": "lower"
+  },
+  {
+    "model": "RF",
+    "metric": "recall1",
+    "paper": 0.88,
+    "mine": 0.909804,
+    "std": 0.020092,
+    "diff": 0.029804,
+    "z": 1.4834,
+    "verdict": "higher"
+  },
+  {
+    "model": "RF",
+    "metric": "f1_0",
+    "paper": 0.85,
+    "mine": 0.846849,
+    "std": 0.03087,
+    "diff": -0.003151,
+    "z": -0.1021,
+    "verdict": "within noise"
+  },
+  {
+    "model": "RF",
+    "metric": "f1_1",
+    "paper": 0.89,
+    "mine": 0.884728,
+    "std": 0.021496,
+    "diff": -0.005272,
+    "z": -0.2453,
+    "verdict": "within noise"
+  },
+  {
+    "model": "RF",
+    "metric": "auc",
+    "paper": 0.94,
+    "mine": 0.92983,
+    "std": 0.008251,
+    "diff": -0.01017,
+    "z": -1.2326,
+    "verdict": "lower"
+  },
+  {
+    "model": "SVM",
+    "metric": "accuracy",
+    "paper": 0.89,
+    "mine": 0.871739,
+    "std": 0.017014,
+    "diff": -0.018261,
+    "z": -1.0733,
+    "verdict": "lower"
+  },
+  {
+    "model": "SVM",
+    "metric": "precision0",
+    "paper": 0.86,
+    "mine": 0.881081,
+    "std": 0.029122,
+    "diff": 0.021081,
+    "z": 0.7239,
+    "verdict": "within noise"
+  },
+  {
+    "model": "SVM",
+    "metric": "precision1",
+    "paper": 0.91,
+    "mine": 0.866062,
+    "std": 0.019398,
+    "diff": -0.043938,
+    "z": -2.2651,
+    "verdict": "lower"
+  },
+  {
+    "model": "SVM",
+    "metric": "recall0",
+    "paper": 0.88,
+    "mine": 0.82439,
+    "std": 0.03061,
+    "diff": -0.05561,
+    "z": -1.8167,
+    "verdict": "lower"
+  },
+  {
+    "model": "SVM",
+    "metric": "recall1",
+    "paper": 0.9,
+    "mine": 0.909804,
+    "std": 0.025377,
+    "diff": 0.009804,
+    "z": 0.3863,
+    "verdict": "within noise"
+  },
+  {
+    "model": "SVM",
+    "metric": "f1_0",
+    "paper": 0.87,
+    "mine": 0.851319,
+    "std": 0.020101,
+    "diff": -0.018681,
+    "z": -0.9294,
+    "verdict": "within noise"
+  },
+  {
+    "model": "SVM",
+    "metric": "f1_1",
+    "paper": 0.91,
+    "mine": 0.887148,
+    "std": 0.01515,
+    "diff": -0.022852,
+    "z": -1.5084,
+    "verdict": "lower"
+  },
+  {
+    "model": "SVM",
+    "metric": "auc",
+    "paper": 0.93,
+    "mine": 0.930655,
+    "std": 0.012067,
+    "diff": 0.000655,
+    "z": 0.0543,
+    "verdict": "within noise"
+  },
+  {
+    "model": "LR",
+    "metric": "accuracy",
+    "paper": 0.86,
+    "mine": 0.869565,
+    "std": 0.015372,
+    "diff": 0.009565,
+    "z": 0.6222,
+    "verdict": "within noise"
+  },
+  {
+    "model": "LR",
+    "metric": "precision0",
+    "paper": 0.8,
+    "mine": 0.86504,
+    "std": 0.028302,
+    "diff": 0.06504,
+    "z": 2.2981,
+    "verdict": "higher"
+  },
+  {
+    "model": "LR",
+    "metric": "precision1",
+    "paper": 0.9,
+    "mine": 0.873624,
+    "std": 0.011118,
+    "diff": -0.026376,
+    "z": -2.3724,
+    "verdict": "lower"
+  },
+  {
+    "model": "LR",
+    "metric": "recall0",
+    "paper": 0.87,
+    "mine": 0.839024,
+    "std": 0.0159,
+    "diff": -0.030976,
+    "z": -1.9482,
+    "verdict": "lower"
+  },
+  {
+    "model": "LR",
+    "metric": "recall1",
+    "paper": 0.84,
+    "mine": 0.894118,
+    "std": 0.025377,
+    "diff": 0.054118,
+    "z": 2.1326,
+    "verdict": "higher"
+  },
+  {
+    "model": "LR",
+    "metric": "f1_0",
+    "paper": 0.83,
+    "mine": 0.851599,
+    "std": 0.016182,
+    "diff": 0.021599,
+    "z": 1.3348,
+    "verdict": "higher"
+  },
+  {
+    "model": "LR",
+    "metric": "f1_1",
+    "paper": 0.87,
+    "mine": 0.883608,
+    "std": 0.014679,
+    "diff": 0.013608,
+    "z": 0.927,
+    "verdict": "within noise"
+  },
+  {
+    "model": "LR",
+    "metric": "auc",
+    "paper": 0.92,
+    "mine": 0.925777,
+    "std": 0.013842,
+    "diff": 0.005777,
+    "z": 0.4174,
+    "verdict": "within noise"
+  },
+  {
+    "model": "DNN",
+    "metric": "accuracy",
+    "paper": 0.89,
+    "mine": 0.859783,
+    "std": 0.018188,
+    "diff": -0.030217,
+    "z": -1.6614,
+    "verdict": "lower"
+  },
+  {
+    "model": "DNN",
+    "metric": "precision0",
+    "paper": 0.83,
+    "mine": 0.841024,
+    "std": 0.030677,
+    "diff": 0.011024,
+    "z": 0.3594,
+    "verdict": "within noise"
+  },
+  {
+    "model": "DNN",
+    "metric": "precision1",
+    "paper": 0.93,
+    "mine": 0.875667,
+    "std": 0.009417,
+    "diff": -0.054333,
+    "z": -5.7697,
+    "verdict": "lower"
+  },
+  {
+    "model": "DNN",
+    "metric": "recall0",
+    "paper": 0.91,
+    "mine": 0.846341,
+    "std": 0.010908,
+    "diff": -0.063659,
+    "z": -5.836,
+    "verdict": "lower"
+  },
+  {
+    "model": "DNN",
+    "metric": "recall1",
+    "paper": 0.87,
+    "mine": 0.870588,
+    "std": 0.029737,
+    "diff": 0.000588,
+    "z": 0.0198,
+    "verdict": "within noise"
+  },
+  {
+    "model": "DNN",
+    "metric": "f1_0",
+    "paper": 0.87,
+    "mine": 0.843461,
+    "std": 0.017782,
+    "diff": -0.026539,
+    "z": -1.4925,
+    "verdict": "lower"
+  },
+  {
+    "model": "DNN",
+    "metric": "f1_1",
+    "paper": 0.9,
+    "mine": 0.872971,
+    "std": 0.018234,
+    "diff": -0.027029,
+    "z": -1.4823,
+    "verdict": "lower"
+  },
+  {
+    "model": "DNN",
+    "metric": "auc",
+    "paper": 0.94,
+    "mine": 0.918914,
+    "std": 0.026812,
+    "diff": -0.021086,
+    "z": -0.7864,
+    "verdict": "within noise"
+  }
+]
