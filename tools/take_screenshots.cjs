@@ -2,10 +2,36 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
-const OUT_DIR = path.resolve('C:/Docs/ML/ml-lab-project/screenshots');
-if (!fs.existsSync(OUT_DIR)) {
-  fs.mkdirSync(OUT_DIR, { recursive: true });
+// CLI Arguments parsing
+const args = process.argv.slice(2);
+let baseUrl = 'http://localhost:5173';
+let outDir = path.resolve(__dirname, '../screenshots');
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--base-url' && args[i + 1]) {
+    baseUrl = args[i + 1];
+    i++;
+  } else if (args[i] === '--out-dir' && args[i + 1]) {
+    outDir = path.resolve(args[i + 1]);
+    i++;
+  } else if (!args[i].startsWith('--')) {
+    if (!baseUrl || baseUrl === 'http://localhost:5173') {
+      baseUrl = args[i];
+    } else {
+      outDir = path.resolve(args[i]);
+    }
+  }
 }
+
+// Ensure base URL has no trailing slash
+baseUrl = baseUrl.replace(/\/+$/, '');
+
+if (!fs.existsSync(outDir)) {
+  fs.mkdirSync(outDir, { recursive: true });
+}
+
+console.log(`Target Base URL: ${baseUrl}`);
+console.log(`Screenshots Output Directory: ${outDir}`);
 
 const ROUTES = [
   { name: 'overview', path: '#/' },
@@ -46,7 +72,7 @@ async function run() {
       }, theme);
 
       for (const route of ROUTES) {
-        const url = `http://localhost:5173/${route.path}`;
+        const url = `${baseUrl}/${route.path}`;
         console.log(`Navigating to ${url}...`);
         await page.goto(url, { waitUntil: 'networkidle' });
         await page.waitForTimeout(600); // allow animations & transitions
@@ -60,13 +86,13 @@ async function run() {
         if (route.name === 'predict') {
           // Trigger a prediction or sample test patient so the risk gauge and results are visible
           try {
-            await page.click('button:has-text("Compute Ensemble Risk")', { timeout: 2000 }).catch(() => {});
+            await page.click('button:has-text("Calculate Risk & Consensus")', { timeout: 2000 }).catch(() => {});
             await page.waitForTimeout(600);
           } catch (e) {}
         }
 
         const filename = `${route.name}_${vp.label}_${theme}.png`;
-        const filepath = path.join(OUT_DIR, filename);
+        const filepath = path.join(outDir, filename);
         await page.screenshot({ path: filepath, fullPage: false });
         console.log(`Saved screenshot: ${filename}`);
       }
@@ -76,7 +102,7 @@ async function run() {
   }
 
   await browser.close();
-  console.log('\nAll screenshots captured successfully in:', OUT_DIR);
+  console.log('\nAll screenshots captured successfully in:', outDir);
 }
 
 run().catch((err) => {

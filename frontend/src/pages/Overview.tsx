@@ -1,22 +1,24 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Layers, Shuffle, Users, Award, ArrowRight,
-  ShieldCheck, Activity, AlertTriangle
+  Layers, Shuffle, Users, ArrowRight,
+  Activity, AlertTriangle
 } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import { useData } from '../useData'
 import { Card, Badge } from '../components/Card'
+import { SegmentedControl } from '../components/SegmentedControl'
 import { TableFallback } from '../components/TableFallback'
-import { fmtPct, fmtAUC, MODEL_LABELS } from '../utils'
+import { MODEL_LABELS } from '../utils'
 
 export default function Overview() {
   const { data, loading, error } = useData()
+  const [yAxisScale, setYAxisScale] = useState<'focused' | 'full'>('focused')
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--muted)' }}>
+      <div className="flex items-center justify-center h-[50vh] text-muted">
         Loading replication data...
       </div>
     )
@@ -24,30 +26,16 @@ export default function Overview() {
 
   if (error || !data) {
     return (
-      <div style={{ padding: '32px', color: '#FB7185' }}>
-        <h3>Error loading replication data</h3>
+      <div className="p-8 text-rose-400">
+        <h3 className="font-bold">Error loading replication data</h3>
         <p>{error}</p>
       </div>
     )
   }
 
-  const { meta, results, comparison } = data
+  const { meta, comparison } = data
 
-  // Find best model by mean accuracy
-  let bestModel = 'SVM'
-  let bestAcc = 0
-  Object.entries(results).forEach(([model, res]) => {
-    const acc = res.stats.accuracy?.mean ?? 0
-    if (acc > bestAcc) {
-      bestAcc = acc
-      bestModel = model
-    }
-  })
-
-  // Compute verdict count: models matching within 1 standard deviation
   const accuracyComp = comparison.filter(c => c.metric === 'accuracy')
-  const withinNoiseCount = accuracyComp.filter(c => c.verdict === 'within noise').length
-  const totalModels = accuracyComp.length
 
   // Prepare mini comparison chart data
   const miniChartData = accuracyComp.map(c => ({
@@ -72,22 +60,22 @@ export default function Overview() {
   }
 
   return (
-    <div style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 20px 48px' }}>
+    <div className="max-w-[1240px] mx-auto px-5 py-6">
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        style={{ marginBottom: 32 }}
+        className="mb-8"
       >
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+        <div className="flex gap-2 items-center mb-3">
           <Badge variant="info">University ML Lab Replication</Badge>
           <Badge variant="default">JAIC 9(6), 2025</Badge>
         </div>
-        <h1 style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.25, color: 'var(--text)', marginBottom: 10 }}>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-text mb-2.5">
           {meta.paper.title}
         </h1>
-        <p style={{ fontSize: '15px', color: 'var(--muted)', maxWidth: 880, lineHeight: 1.6 }}>
+        <p className="text-sm sm:text-base text-muted max-w-3xl leading-relaxed">
           An autonomous verification and comparative study replicating machine learning and deep learning pipelines on the Kaggle Heart Failure dataset across 5 stratified random seeds, evaluating generalization stability beyond the paper's single-split report.
         </p>
       </motion.div>
@@ -97,23 +85,18 @@ export default function Overview() {
         variants={containerAnimation}
         initial="hidden"
         animate="show"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 16,
-          marginBottom: 28,
-        }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-7"
       >
         <motion.div variants={itemAnimation}>
           <Card>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>Models Replicated</span>
-              <Layers size={18} color="var(--teal)" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted font-medium">Models Replicated</span>
+              <Layers size={18} className="text-teal" />
             </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div className="text-3xl font-extrabold text-text font-mono">
               6
             </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            <div className="text-xs text-muted mt-1">
               NB, DT, RF, SVM, LR, DNN
             </div>
           </Card>
@@ -121,14 +104,14 @@ export default function Overview() {
 
         <motion.div variants={itemAnimation}>
           <Card>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>Random Seeds Evaluated</span>
-              <Shuffle size={18} color="var(--amber)" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted font-medium">Random Seeds Evaluated</span>
+              <Shuffle size={18} className="text-amber" />
             </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div className="text-3xl font-extrabold text-text font-mono">
               5
             </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            <div className="text-xs text-muted mt-1">
               Seeds 42, 43, 44, 45, 46 (stratified 80:20)
             </div>
           </Card>
@@ -136,91 +119,71 @@ export default function Overview() {
 
         <motion.div variants={itemAnimation}>
           <Card>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>Test Patients / Seed</span>
-              <Users size={18} color="var(--slate-blue)" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted font-medium">Test Patients / Seed</span>
+              <Users size={18} className="text-slateBlue" />
             </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div className="text-3xl font-extrabold text-text font-mono">
               184
             </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            <div className="text-xs text-muted mt-1">
               102 disease, 82 healthy (~0.54% per patient)
             </div>
           </Card>
         </motion.div>
-
-        <motion.div variants={itemAnimation}>
-          <Card>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>Top Performing Model</span>
-              <Award size={18} color="#34D399" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace' }}>
-                {bestModel}
-              </span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#34D399', fontFamily: 'JetBrains Mono, monospace' }}>
-                {fmtPct(bestAcc)}
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-              AUC: {fmtAUC(results[bestModel]?.stats.auc?.mean ?? 0)} ± {fmtAUC(results[bestModel]?.stats.auc?.std ?? 0)}
-            </div>
-          </Card>
-        </motion.div>
       </motion.div>
 
-      {/* Computed Verdict Sentence Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-        style={{ marginBottom: 28 }}
-      >
-        <Card style={{ background: 'var(--elevated)', borderLeft: '4px solid var(--teal)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-            <ShieldCheck size={24} color="var(--teal)" style={{ flexShrink: 0, marginTop: 2 }} />
+      {/* Main Grid: Comparison Chart + Deep-dive Links */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-7">
+        {/* Comparison Mini Chart */}
+        <Card className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                Replication Verdict: {withinNoiseCount} of {totalModels} models match the paper within 1 standard deviation
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-text">Paper vs. Replication (Accuracy %)</h3>
+                <Badge variant={yAxisScale === 'focused' ? 'warning' : 'default'}>
+                  {yAxisScale === 'focused' ? 'Y-axis starts at 70%' : 'Y-axis starts at 0%'}
+                </Badge>
               </div>
-              <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
-                Naïve Bayes, Random Forest, and Logistic Regression replicated within noise bounds (|diff| ≤ 1 SD). Decision Tree replicated significantly higher (+4.4 pp accuracy, +10.0 pp AUC), while the DNN demonstrated higher variance across seeds due to absence of early stopping.
-              </p>
+              <p className="text-xs text-muted mt-0.5">Mean replication accuracy across 5 seeds vs paper's single-split report</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <SegmentedControl
+                options={[
+                  { value: 'focused', label: '70%–100%' },
+                  { value: 'full', label: '0%–100%' },
+                ]}
+                value={yAxisScale}
+                onChange={(v) => setYAxisScale(v as 'focused' | 'full')}
+                size="sm"
+              />
+              <Link to="/comparison" className="text-xs text-teal hover:underline flex items-center gap-1 font-medium">
+                Full report <ArrowRight size={14} />
+              </Link>
             </div>
           </div>
-        </Card>
-      </motion.div>
 
-      {/* Mini Comparison Chart & Quick Navigation */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 24, marginBottom: 32 }}>
-        {/* Compact Mini Chart */}
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Paper vs. Replication (Accuracy %)</h3>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '2px 0 0' }}>Mean replication accuracy across 5 seeds vs paper's single-split report</p>
-            </div>
-            <Link to="/comparison" style={{ fontSize: 12, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-              Full report <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          <div style={{ height: 260, width: '100%' }}>
+          <div className="h-[260px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={miniChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="model" stroke="var(--muted)" fontSize={12} tickLine={false} />
-                <YAxis domain={[70, 100]} stroke="var(--muted)" fontSize={11} tickFormatter={(v) => `${v}%`} tickLine={false} />
+                <YAxis
+                  domain={yAxisScale === 'focused' ? [70, 100] : [0, 100]}
+                  stroke="var(--muted)"
+                  fontSize={11}
+                  tickFormatter={(v) => `${v}%`}
+                  tickLine={false}
+                />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const d = payload[0].payload
                       return (
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
-                          <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{d.fullName} ({d.model})</div>
-                          <div style={{ color: '#7FA6D6' }}>Paper: <b>{d.paper}%</b></div>
-                          <div style={{ color: '#F59E0B' }}>Replication: <b>{d.mine}% ± {d.std}%</b></div>
+                        <div className="bg-surface border border-border p-2.5 rounded-lg text-xs shadow-lg">
+                          <div className="font-bold text-text mb-1">{d.fullName} ({d.model})</div>
+                          <div className="text-blue-300">Paper: <b>{d.paper}%</b></div>
+                          <div className="text-amber">Replication: <b>{d.mine}% ± {d.std}%</b></div>
                         </div>
                       )
                     }
@@ -245,42 +208,42 @@ export default function Overview() {
         </Card>
 
         {/* Feature Cards Linking to Findings & Predict */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Link to="/findings" style={{ textDecoration: 'none', flex: 1 }}>
-            <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(245,158,11,0.25)' }}>
+        <div className="flex flex-col gap-4">
+          <Link to="/findings" className="block flex-1 group">
+            <Card className="h-full flex flex-col justify-between border-amber/30 group-hover:border-amber/60 transition-colors">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div className="flex items-center justify-between mb-2.5">
                   <Badge variant="warning">Methodology Finding</Badge>
-                  <AlertTriangle size={18} color="var(--amber)" />
+                  <AlertTriangle size={18} className="text-amber" />
                 </div>
-                <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: '0 0 6px' }}>
+                <h4 className="text-base font-bold text-text mb-1.5">
                   Zero-Coded Cholesterol Missingness
                 </h4>
-                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+                <p className="text-xs sm:text-sm text-muted leading-relaxed">
                   172 patients (18.7%) have Cholesterol = 0, which strongly biases models toward predicting disease (88.4% disease rate vs 47.7% in non-zero cohort).
                 </p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--amber)', fontWeight: 600, marginTop: 12 }}>
+              <div className="flex items-center gap-1.5 text-xs text-amber font-semibold mt-3">
                 Explore all findings & limitations <ArrowRight size={14} />
               </div>
             </Card>
           </Link>
 
-          <Link to="/predict" style={{ textDecoration: 'none', flex: 1 }}>
-            <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(45,212,191,0.25)' }}>
+          <Link to="/predict" className="block flex-1 group">
+            <Card className="h-full flex flex-col justify-between border-teal/30 group-hover:border-teal/60 transition-colors">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div className="flex items-center justify-between mb-2.5">
                   <Badge variant="info">Interactive System</Badge>
-                  <Activity size={18} color="var(--teal)" />
+                  <Activity size={18} className="text-teal" />
                 </div>
-                <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: '0 0 6px' }}>
+                <h4 className="text-base font-bold text-text mb-1.5">
                   Live Heart Disease Predictor
                 </h4>
-                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+                <p className="text-xs sm:text-sm text-muted leading-relaxed">
                   Input patient attributes or test against randomly selected held-out test patients from the seed-42 split to view multi-model consensus and ensemble probabilities.
                 </p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--teal)', fontWeight: 600, marginTop: 12 }}>
+              <div className="flex items-center gap-1.5 text-xs text-teal font-semibold mt-3">
                 Open live predictor <ArrowRight size={14} />
               </div>
             </Card>

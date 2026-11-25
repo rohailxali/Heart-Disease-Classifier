@@ -4,7 +4,23 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Heart Disease ML & DL Replication | Simanjuntak et al. (2025)</title>
+    <meta name="description" content="Production replication and comparative benchmark of 6 machine learning and deep learning models for heart disease classification." />
+    <meta name="theme-color" content="#0A0F1C" />
+    <meta property="og:title" content="Heart Disease ML & DL Replication (JAIC 2025)" />
+    <meta property="og:description" content="Interactive reproduction and analysis of Simanjuntak et al. (2025) using 5-seed cross-validation across 6 models." />
+    <meta property="og:type" content="website" />
+    <!-- Inline script to set data-theme before React renders to prevent flash -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('theme');
+          var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          var theme = saved ? saved : (prefersLight ? 'light' : 'dark');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

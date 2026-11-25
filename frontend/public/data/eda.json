@@ -512,6 +512,14 @@
     "zero_restingbp_rows": 1,
     "disease_rate_zero_cholesterol_pct": 88.37,
     "disease_rate_nonzero_cholesterol_pct": 47.72,
+    "cholesterol_zero_x_disease": {
+      "zero_chol_disease": 152,
+      "zero_chol_healthy": 20,
+      "nonzero_chol_disease": 356,
+      "nonzero_chol_healthy": 390,
+      "total_zero_chol": 172,
+      "total_nonzero_chol": 746
+    },
     "cholesterol_all_hist": {
       "edges": [
         0.0,

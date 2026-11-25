@@ -14,6 +14,7 @@ import pandas as pd
 # ── paths ──────────────────────────────────────────────────────────────────────
 _HERE   = Path(__file__).resolve().parent
 RH      = _HERE / "results_heart"
+RV      = _HERE / "results_variants"
 DATA    = _HERE / "heart.csv"
 OUT     = _HERE / "frontend" / "public" / "data"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -139,11 +140,16 @@ corr = num_df.corr().round(4)
 # Data-quality block
 zero_chol = int((df.Cholesterol == 0).sum())
 zero_bp   = int((df.RestingBP == 0).sum())
-disease_rate_zero_chol    = round(df[df.Cholesterol == 0]["HeartDisease"].mean() * 100, 2)
-disease_rate_nonzero_chol = round(df[df.Cholesterol != 0]["HeartDisease"].mean() * 100, 2)
+disease_rate_zero_chol    = round(float(df[df.Cholesterol == 0]["HeartDisease"].mean() * 100), 2)
+disease_rate_nonzero_chol = round(float(df[df.Cholesterol != 0]["HeartDisease"].mean() * 100), 2)
+
+# Exact 2x2 counts of (Cholesterol==0 yes/no) x (disease yes/no)
+zero_chol_disease = int(((df.Cholesterol == 0) & (df.HeartDisease == 1)).sum())
+zero_chol_healthy = int(((df.Cholesterol == 0) & (df.HeartDisease == 0)).sum())
+nonzero_chol_disease = int(((df.Cholesterol != 0) & (df.HeartDisease == 1)).sum())
+nonzero_chol_healthy = int(((df.Cholesterol != 0) & (df.HeartDisease == 0)).sum())
 
 # Cholesterol before/after histogram (using 0 and non-zero separately)
-chol_zero_hist = histograms_by_class("Cholesterol")
 chol_nonzero = df[df.Cholesterol != 0].copy()
 chol_nonzero_min = float(chol_nonzero["Cholesterol"].min())
 chol_nonzero_max = float(chol_nonzero["Cholesterol"].max())
@@ -170,6 +176,14 @@ eda = {
         "zero_restingbp_rows": zero_bp,
         "disease_rate_zero_cholesterol_pct": disease_rate_zero_chol,
         "disease_rate_nonzero_cholesterol_pct": disease_rate_nonzero_chol,
+        "cholesterol_zero_x_disease": {
+            "zero_chol_disease": zero_chol_disease,
+            "zero_chol_healthy": zero_chol_healthy,
+            "nonzero_chol_disease": nonzero_chol_disease,
+            "nonzero_chol_healthy": nonzero_chol_healthy,
+            "total_zero_chol": zero_chol,
+            "total_nonzero_chol": int(len(df) - zero_chol),
+        },
         "cholesterol_all_hist": num_histograms["Cholesterol"],
         "cholesterol_nonzero_hist": {
             "edges": [round(float(e), 4) for e in chol_edges_nz],
@@ -321,5 +335,104 @@ assumptions = [
 ]
 
 jdump(assumptions, OUT / "assumptions.json")
+
+# ── 8. variants.json ──────────────────────────────────────────────────────────
+print("→ variants.json")
+
+# Check if results_variants/summary.json exists
+var_summary_file = RV / "summary.json"
+raw_b_file = RV / "raw_variant_b.csv"
+raw_a_file = RV / "raw_variant_a.csv"
+
+variants_out = {}
+if var_summary_file.exists():
+    with open(var_summary_file, "r", encoding="utf-8") as f:
+        variants_out = json.load(f)
+else:
+    # Build default structure if summary.json has not been generated yet
+    n_zero_chol = int((df["Cholesterol"] == 0).sum())
+    n_zero_bp = int((df["RestingBP"] == 0).sum())
+    disease_rate_zero_chol = round(float(df[df["Cholesterol"] == 0]["HeartDisease"].mean() * 100), 1)
+    variants_out = {
+        "variant_a_dnn_early_stopping": {
+            "title": "Variant A: DNN Early Stopping & Loss-Based Tuning",
+            "description": "Applies tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True) and selects hyperparameter config by minimum validation loss instead of final-epoch accuracy.",
+            "hypothesis": "Designed to prevent late-epoch validation loss divergence observed during unconstrained training, stabilizing cross-seed variance.",
+            "status": "not_run"
+        },
+        "variant_b_median_imputation": {
+            "title": "Variant B: Median Imputation of Zero Measurements",
+            "description": f"Replaces zero values in Cholesterol ({n_zero_chol} rows) and RestingBP ({n_zero_bp} row) with NaN and applies SimpleImputer(strategy='median') strictly fit inside training folds to prevent data leakage.",
+            "hypothesis": f"Removes the artificial proxy shortcut where models exploit Cholesterol==0 as an indicator of {disease_rate_zero_chol}% disease prevalence, measuring true physiological generalization.",
+            "status": "executed" if raw_b_file.exists() else "not_run"
+        }
+    }
+
+# Compute deltas of Variant B versus baseline from raw.csv and raw_variant_b.csv
+if raw_b_file.exists():
+    df_vb = pd.read_csv(raw_b_file)
+    deltas_b = {}
+    models_b_dict = variants_out.get("variant_b_median_imputation", {}).get("models", {})
+    for m in ["NB", "DT", "RF", "SVM", "LR"]:
+        base_sub = raw[raw.model == m]
+        vb_sub = df_vb[df_vb.model == m]
+
+        base_acc = float(base_sub["accuracy"].mean())
+        vb_acc = float(vb_sub["accuracy"].mean())
+        delta_acc_pp = round((vb_acc - base_acc) * 100, 2)
+
+        base_auc = float(base_sub["auc"].mean())
+        vb_auc = float(vb_sub["auc"].mean())
+        delta_auc_pp = round((vb_auc - base_auc) * 100, 2)
+
+        deltas_b[m] = {
+            "baseline_accuracy": round(base_acc, 4),
+            "variant_b_accuracy": round(vb_acc, 4),
+            "delta_accuracy_pp": delta_acc_pp,
+            "baseline_auc": round(base_auc, 4),
+            "variant_b_auc": round(vb_auc, 4),
+            "delta_auc_pp": delta_auc_pp,
+        }
+
+        # Ensure summary model stats are populated
+        if m not in models_b_dict:
+            models_b_dict[m] = {
+                met: {"mean": round(float(vb_sub[met].mean()), 4), "std": round(float(vb_sub[met].std()), 4)}
+                for met in METRICS
+            }
+    if "variant_b_median_imputation" in variants_out:
+        variants_out["variant_b_median_imputation"]["models"] = models_b_dict
+        variants_out["variant_b_median_imputation"]["deltas_vs_baseline"] = deltas_b
+
+# Check if Variant A exists
+if raw_a_file.exists():
+    df_va = pd.read_csv(raw_a_file)
+    base_sub = raw[raw.model == "DNN"]
+    va_sub = df_va[df_va.model == "DNN"]
+    base_acc = float(base_sub["accuracy"].mean())
+    va_acc = float(va_sub["accuracy"].mean())
+    base_auc = float(base_sub["auc"].mean())
+    va_auc = float(va_sub["auc"].mean())
+
+    if "variant_a_dnn_early_stopping" in variants_out:
+        variants_out["variant_a_dnn_early_stopping"]["status"] = "executed"
+        variants_out["variant_a_dnn_early_stopping"]["deltas_vs_baseline"] = {
+            "DNN": {
+                "baseline_accuracy": round(base_acc, 4),
+                "variant_a_accuracy": round(va_acc, 4),
+                "delta_accuracy_pp": round((va_acc - base_acc) * 100, 2),
+                "baseline_auc": round(base_auc, 4),
+                "variant_a_auc": round(va_auc, 4),
+                "delta_auc_pp": round((va_auc - base_auc) * 100, 2),
+            }
+        }
+        variants_out["variant_a_dnn_early_stopping"]["models"] = {
+            "DNN": {
+                met: {"mean": round(float(va_sub[met].mean()), 4), "std": round(float(va_sub[met].std()), 4)}
+                for met in METRICS
+            }
+        }
+
+jdump(safe(variants_out), OUT / "variants.json")
 
 print("\nAll JSON files written to", OUT)

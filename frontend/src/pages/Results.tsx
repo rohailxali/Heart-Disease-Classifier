@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Award, ArrowUpDown, AlertTriangle
+  Award, AlertTriangle
 } from 'lucide-react'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import { useData } from '../useData'
 import { Card, Badge } from '../components/Card'
+import { SegmentedControl } from '../components/SegmentedControl'
 import { fmtPct, fmtAUC, MODELS, MODEL_LABELS } from '../utils'
 
 type SortField = 'accuracy' | 'auc' | 'precision0' | 'precision1' | 'recall0' | 'recall1' | 'f1_0' | 'f1_1' | 'cv_acc'
@@ -27,8 +28,8 @@ export default function Results() {
   const [curveSeed, setCurveSeed] = useState<number>(44) // Default to 44 to highlight overfitting finding
   const [curveMetric, setCurveMetric] = useState<'loss' | 'accuracy'>('loss')
 
-  if (loading) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading results...</div>
-  if (error || !data) return <div style={{ padding: 32, color: '#FB7185' }}>Error: {error}</div>
+  if (loading) return <div className="p-8 text-muted">Loading results...</div>
+  if (error || !data) return <div className="p-8 text-rose-400">Error: {error}</div>
 
   const { results, params, curves } = data
 
@@ -116,488 +117,309 @@ export default function Results() {
       }))
     : []
 
+  // Dynamic derivation of Seed 44 statistics
+  const dnnSeed44 = results.DNN.per_seed.find(r => r.seed === 44)
+  const dnnMeanAcc = results.DNN.stats.accuracy?.mean ?? 0
+  const dnnSeed44Acc = dnnSeed44?.accuracy ?? 0
+  const dnnSeed44Auc = dnnSeed44?.auc ?? 0
+
+  const c44 = curves['44']
+  let minLoss = 0.32
+  let minEpoch = 3
+  let maxLoss = 1.56
+  let maxEpoch = 50
+  if (c44 && c44.val_loss.length > 0) {
+    minLoss = Math.min(...c44.val_loss)
+    minEpoch = c44.val_loss.indexOf(minLoss) + 1
+    maxLoss = Math.max(...c44.val_loss)
+    maxEpoch = c44.val_loss.indexOf(maxLoss) + 1
+  }
+
+  const lossEscalationPct = minLoss > 0 ? Math.round(((maxLoss - minLoss) / minLoss) * 100) : 0
+
+  const seed44Stats = {
+    testAcc: (dnnSeed44Acc * 100).toFixed(2),
+    meanAcc: (dnnMeanAcc * 100).toFixed(2),
+    testAuc: dnnSeed44Auc.toFixed(4),
+    minLoss: minLoss.toFixed(3),
+    minEpoch,
+    maxLoss: maxLoss.toFixed(3),
+    maxEpoch,
+    lossEscalationPct,
+    batch: c44?.best_config.batch ?? 16,
+    lr: c44?.best_config.lr ?? 0.01,
+    epochs: c44?.best_config.epochs ?? 50,
+  }
+
   return (
-    <div style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 20px 48px' }}>
+    <div className="max-w-[1240px] mx-auto px-5 py-6">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-7">
+        <div className="flex gap-2 items-center mb-2">
           <Badge variant="info">Empirical Results</Badge>
           <Badge variant="default">5 Seeds (42–46)</Badge>
         </div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', margin: '0 0 8px' }}>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight mb-2">
           Model Benchmark Leaderboard & Error Analysis
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, maxWidth: 880 }}>
+        <p className="text-sm text-muted max-w-3xl leading-relaxed">
           Comprehensive evaluation of all 6 models across 5 random seeds (734 train, 184 test patients per seed). Explore performance metrics, per-seed dispersion, confusion matrices, and DNN convergence dynamics.
         </p>
       </motion.div>
 
       {/* Sortable Leaderboard */}
-      <Card style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+      <Card className="mb-7">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2.5">
           <div>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+            <h3 className="text-base font-bold text-text">
               Replication Performance Leaderboard (Mean ± SD)
             </h3>
-            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+            <p className="text-xs text-muted">
               Click column headers to sort. Best value per metric highlighted in green.
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
-            <Award size={15} color="#34D399" /> Best in class
+          <div className="flex items-center gap-1.5 text-xs text-muted">
+            <Award size={15} className="text-emerald-400" /> Best in class
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 840 }}>
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '10px 12px', fontSize: 12, color: 'var(--muted)' }}>Model</th>
+              <tr className="border-b border-border bg-elevated/60 text-muted uppercase font-semibold">
+                <th className="py-3 px-3">Model</th>
                 <th
                   onClick={() => handleSort('accuracy')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'accuracy' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    Accuracy ± SD <ArrowUpDown size={12} />
-                  </div>
+                  Accuracy {sortField === 'accuracy' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
                 <th
                   onClick={() => handleSort('auc')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'auc' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    ROC-AUC ± SD <ArrowUpDown size={12} />
-                  </div>
+                  AUC {sortField === 'auc' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
                 <th
                   onClick={() => handleSort('precision0')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'precision0' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    P (Healthy) <ArrowUpDown size={12} />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort('precision1')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'precision1' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    P (Disease) <ArrowUpDown size={12} />
-                  </div>
+                  Prec (0) {sortField === 'precision0' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
                 <th
                   onClick={() => handleSort('recall0')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'recall0' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    R (Healthy) <ArrowUpDown size={12} />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort('recall1')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'recall1' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    R (Disease) <ArrowUpDown size={12} />
-                  </div>
+                  Recall (0) {sortField === 'recall0' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
                 <th
                   onClick={() => handleSort('f1_0')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'f1_0' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    F1 (Healthy) <ArrowUpDown size={12} />
-                  </div>
+                  F1 (0) {sortField === 'f1_0' ? (sortAsc ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  onClick={() => handleSort('precision1')}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
+                >
+                  Prec (1) {sortField === 'precision1' ? (sortAsc ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  onClick={() => handleSort('recall1')}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
+                >
+                  Recall (1) {sortField === 'recall1' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
                 <th
                   onClick={() => handleSort('f1_1')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'f1_1' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    F1 (Disease) <ArrowUpDown size={12} />
-                  </div>
+                  F1 (1) {sortField === 'f1_1' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
                 <th
                   onClick={() => handleSort('cv_acc')}
-                  style={{ padding: '10px 12px', fontSize: 12, color: sortField === 'cv_acc' ? 'var(--teal)' : 'var(--muted)', cursor: 'pointer' }}
+                  className="py-3 px-3 cursor-pointer hover:text-text"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    5-Fold CV Acc <ArrowUpDown size={12} />
-                  </div>
+                  CV Acc {sortField === 'cv_acc' ? (sortAsc ? '▲' : '▼') : ''}
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {sortedLeaderboard.map((row) => {
-                const isBestAcc = Math.abs(row.accuracy - bestValues.accuracy) < 1e-4
-                const isBestAuc = Math.abs(row.auc - bestValues.auc) < 1e-4
-
-                return (
-                  <tr
-                    key={row.model}
-                    style={{
-                      borderBottom: '1px solid var(--border)',
-                      fontSize: 13,
-                      fontFamily: 'JetBrains Mono, monospace',
-                      background: row.model === 'SVM' ? 'rgba(45,212,191,0.04)' : 'transparent',
-                    }}
-                  >
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text)', fontFamily: 'Inter, sans-serif' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>{row.model}</span>
-                        <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}>({row.name})</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '10px 12px', color: isBestAcc ? '#34D399' : 'var(--text)', fontWeight: isBestAcc ? 700 : 500 }}>
-                      {fmtPct(row.accuracy)} <span style={{ fontSize: 11, color: 'var(--muted)' }}>± {(row.accuracy_std * 100).toFixed(1)}%</span>
-                    </td>
-                    <td style={{ padding: '10px 12px', color: isBestAuc ? '#34D399' : 'var(--text)', fontWeight: isBestAuc ? 700 : 500 }}>
-                      {fmtAUC(row.auc)} <span style={{ fontSize: 11, color: 'var(--muted)' }}>± {fmtAUC(row.auc_std)}</span>
-                    </td>
-                    <td style={{ padding: '10px 12px', color: Math.abs(row.precision0 - bestValues.precision0) < 1e-4 ? '#34D399' : 'var(--muted)' }}>
-                      {fmtPct(row.precision0)}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: Math.abs(row.precision1 - bestValues.precision1) < 1e-4 ? '#34D399' : 'var(--muted)' }}>
-                      {fmtPct(row.precision1)}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: Math.abs(row.recall0 - bestValues.recall0) < 1e-4 ? '#34D399' : 'var(--muted)' }}>
-                      {fmtPct(row.recall0)}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: Math.abs(row.recall1 - bestValues.recall1) < 1e-4 ? '#34D399' : 'var(--muted)' }}>
-                      {fmtPct(row.recall1)}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: Math.abs(row.f1_0 - bestValues.f1_0) < 1e-4 ? '#34D399' : 'var(--muted)' }}>
-                      {fmtPct(row.f1_0)}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: Math.abs(row.f1_1 - bestValues.f1_1) < 1e-4 ? '#34D399' : 'var(--muted)' }}>
-                      {fmtPct(row.f1_1)}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--muted)' }}>
-                      {row.cv_acc !== null ? fmtPct(row.cv_acc) : <span style={{ fontStyle: 'italic', color: 'var(--muted)' }}>N/A (split)</span>}
-                    </td>
-                  </tr>
-                )
-              })}
+            <tbody className="divide-y divide-border/60">
+              {sortedLeaderboard.map((row) => (
+                <tr key={row.model} className="hover:bg-elevated/40 transition-colors">
+                  <td className="py-3 px-3 font-bold text-text">
+                    {row.model} <span className="font-normal text-muted">({row.name})</span>
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.accuracy === bestValues.accuracy ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.accuracy)} ± {(row.accuracy_std * 100).toFixed(2)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.auc === bestValues.auc ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtAUC(row.auc)} ± {row.auc_std.toFixed(4)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.precision0 === bestValues.precision0 ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.precision0)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.recall0 === bestValues.recall0 ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.recall0)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.f1_0 === bestValues.f1_0 ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.f1_0)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.precision1 === bestValues.precision1 ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.precision1)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.recall1 === bestValues.recall1 ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.recall1)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.f1_1 === bestValues.f1_1 ? 'text-emerald-400 font-bold' : ''}`}>
+                    {fmtPct(row.f1_1)}
+                  </td>
+                  <td className={`py-3 px-3 font-mono ${row.cv_acc && row.cv_acc === bestValues.cv_acc ? 'text-emerald-400 font-bold' : 'text-muted'}`}>
+                    {row.cv_acc ? fmtPct(row.cv_acc) : 'N/A'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {/* Per-Seed Accuracy Strip Plot (Custom SVG) */}
-      <Card style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-              Per-Seed Test Accuracy Dispersion
-            </h3>
-            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-              Individual test accuracy for seeds 42, 43, 44, 45, 46. Seed 44 DNN outlier prominently highlighted.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--muted)' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--teal)' }} /> Seeds 42-46
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#FB7185' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#FB7185' }} /> Seed 44 Outlier
-            </span>
-          </div>
-        </div>
-
-        {/* Custom SVG Strip Plot */}
-        <div style={{ overflowX: 'auto', padding: '10px 0' }}>
-          <svg viewBox="0 0 740 220" style={{ width: '100%', minWidth: 620, height: 'auto', display: 'block' }}>
-            {/* Grid lines and Y-axis (78% to 92%) */}
-            {[0.78, 0.81, 0.84, 0.87, 0.90, 0.92].map((yVal) => {
-              // Y scale: 0.78 -> 190, 0.92 -> 20
-              const yPos = 190 - ((yVal - 0.78) / (0.92 - 0.78)) * 170
-              return (
-                <g key={yVal}>
-                  <line x1="60" y1={yPos} x2="720" y2={yPos} stroke="var(--border)" strokeDasharray="3 3" />
-                  <text x="50" y={yPos + 4} fill="var(--muted)" fontSize="10" textAnchor="end" fontFamily="JetBrains Mono">
-                    {(yVal * 100).toFixed(0)}%
-                  </text>
-                </g>
-              )
-            })}
-
-            {/* Model Columns */}
-            {MODELS.map((model, mIdx) => {
-              const xPos = 110 + mIdx * 105
-              const perSeed = results[model].per_seed
-              const meanAcc = results[model].stats.accuracy?.mean ?? 0
-              const meanY = 190 - ((meanAcc - 0.78) / (0.92 - 0.78)) * 170
-
-              return (
-                <g key={model}>
-                  {/* Model column line & label */}
-                  <line x1={xPos} y1="20" x2={xPos} y2="190" stroke="rgba(148,163,184,0.12)" strokeWidth="1" />
-                  <text x={xPos} y="210" fill="var(--text)" fontSize="12" fontWeight="700" textAnchor="middle">
-                    {model}
-                  </text>
-
-                  {/* Mean marker line */}
-                  <line x1={xPos - 16} y1={meanY} x2={xPos + 16} y2={meanY} stroke="#F59E0B" strokeWidth="2" />
-
-                  {/* Individual seed dots */}
-                  {perSeed.map((row) => {
-                    const accY = 190 - ((row.accuracy - 0.78) / (0.92 - 0.78)) * 170
-                    const isOutlier = model === 'DNN' && row.seed === 44
-
-                    return (
-                      <g key={row.seed}>
-                        <circle
-                          cx={xPos}
-                          cy={accY}
-                          r={isOutlier ? 6 : 4}
-                          fill={isOutlier ? '#FB7185' : 'var(--teal)'}
-                          stroke="var(--surface)"
-                          strokeWidth="1.5"
-                        />
-                        {isOutlier && (
-                          <g>
-                            {/* Annotation line and text */}
-                            <line x1={xPos + 6} y1={accY} x2={xPos + 36} y2={accY - 18} stroke="#FB7185" strokeWidth="1.2" />
-                            <rect x={xPos + 38} y={accY - 32} width="110" height="26" rx="4" fill="var(--surface)" stroke="#FB7185" />
-                            <text x={xPos + 44} y={accY - 16} fill="#FB7185" fontSize="10" fontWeight="700">
-                              Seed 44: 83.15% ⚠
-                            </text>
-                          </g>
-                        )}
-                      </g>
-                    )
-                  })}
-                </g>
-              )
-            })}
-          </svg>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, fontStyle: 'italic' }}>
-          Amber bars represent mean accuracy. Note how Decision Tree and DNN exhibit broader spread across random splits, while Logistic Regression and Naïve Bayes maintain tight clustering.
-        </div>
-      </Card>
-
-      {/* Confusion Matrices & Hyperparameter Stability Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 20, marginBottom: 28 }}>
-        {/* Confusion Matrix Interactive Viewer */}
+      {/* Two Column Grid: Confusion Matrix & Hyperparameters */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-7">
+        {/* Interactive Confusion Matrix */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-                Confusion Matrix Explorer
-              </h3>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                {cmSeed === 'pooled' ? 'Summed over 5 seeds (920 test cases)' : `Seed ${cmSeed} hold-out test set (184 cases)`}
-              </p>
+              <h3 className="text-base font-bold text-text">Interactive Confusion Matrix</h3>
+              <p className="text-xs text-muted">Examine error distribution (False Negatives vs False Positives)</p>
             </div>
-
-            {/* Model Selector */}
-            <select
-              value={cmModel}
-              onChange={(e) => setCmModel(e.target.value)}
-              style={{
-                background: 'var(--elevated)',
-                border: '1px solid var(--border)',
-                color: 'var(--text)',
-                padding: '4px 8px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-              }}
-            >
-              {MODELS.map(m => (
-                <option key={m} value={m}>{m} ({MODEL_LABELS[m]})</option>
+            <div className="flex gap-1.5 flex-wrap">
+              {MODELS.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setCmModel(m)}
+                  className={`px-2 py-1 text-xs font-semibold rounded-md border transition-colors ${
+                    cmModel === m
+                      ? 'border-teal bg-teal/15 text-teal'
+                      : 'border-border text-muted hover:text-text'
+                  }`}
+                >
+                  {m}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
-          {/* Seed and Format Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                onClick={() => setCmSeed('pooled')}
-                style={{
-                  padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                  border: '1px solid',
-                  borderColor: cmSeed === 'pooled' ? 'var(--teal)' : 'var(--border)',
-                  background: cmSeed === 'pooled' ? 'rgba(45,212,191,0.15)' : 'transparent',
-                  color: cmSeed === 'pooled' ? 'var(--teal)' : 'var(--muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                Pooled (All 5)
-              </button>
-              {[42, 43, 44, 45, 46].map((s) => (
+          {/* Seed Selector & Mode Toggle */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex gap-1">
+              {(['pooled', 42, 43, 44, 45, 46] as const).map((s) => (
                 <button
-                  key={s}
+                  key={String(s)}
                   onClick={() => setCmSeed(s)}
-                  style={{
-                    padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                    border: '1px solid',
-                    borderColor: cmSeed === s ? 'var(--teal)' : 'var(--border)',
-                    background: cmSeed === s ? 'rgba(45,212,191,0.15)' : 'transparent',
-                    color: cmSeed === s ? 'var(--teal)' : 'var(--muted)',
-                    cursor: 'pointer',
-                  }}
+                  className={`px-2 py-0.5 text-xs font-medium rounded border transition-colors ${
+                    cmSeed === s
+                      ? 'border-teal bg-teal/15 text-teal'
+                      : 'border-border text-muted hover:text-text'
+                  }`}
                 >
-                  Seed {s}
+                  {s === 'pooled' ? 'Pooled (5 seeds)' : `Seed ${s}`}
                 </button>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                onClick={() => setCmMode('counts')}
-                style={{
-                  padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                  border: '1px solid',
-                  borderColor: cmMode === 'counts' ? 'var(--amber)' : 'var(--border)',
-                  background: cmMode === 'counts' ? 'rgba(245,158,11,0.15)' : 'transparent',
-                  color: cmMode === 'counts' ? 'var(--amber)' : 'var(--muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                Counts
-              </button>
-              <button
-                onClick={() => setCmMode('percent')}
-                style={{
-                  padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                  border: '1px solid',
-                  borderColor: cmMode === 'percent' ? 'var(--amber)' : 'var(--border)',
-                  background: cmMode === 'percent' ? 'rgba(245,158,11,0.15)' : 'transparent',
-                  color: cmMode === 'percent' ? 'var(--amber)' : 'var(--muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                Percentages
-              </button>
-            </div>
+            <SegmentedControl
+              options={[
+                { value: 'counts', label: 'Counts' },
+                { value: 'percent', label: 'Percentages' },
+              ]}
+              value={cmMode}
+              onChange={(val) => setCmMode(val as 'counts' | 'percent')}
+              size="sm"
+            />
           </div>
 
           {/* 2x2 Matrix Display */}
-          <div style={{ maxWidth: 360, margin: '0 auto', padding: '10px 0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: 8, alignItems: 'center' }}>
+          <div className="max-w-[340px] mx-auto py-2">
+            <div className="grid grid-cols-[70px_1fr_1fr] gap-2 items-center">
               <div />
-              <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                Pred Healthy (0)
-              </div>
-              <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                Pred Disease (1)
-              </div>
+              <div className="text-center text-xs font-bold text-text">Pred Healthy (0)</div>
+              <div className="text-center text-xs font-bold text-text">Pred Disease (1)</div>
 
               {/* Row 1: Actual Healthy */}
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                Actual Healthy (0)
-              </div>
-              <div
-                style={{
-                  background: 'rgba(45,212,191,0.18)',
-                  border: '1px solid rgba(45,212,191,0.4)',
-                  borderRadius: 8,
-                  padding: 16,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 10, color: 'var(--teal)', fontWeight: 700 }}>TRUE NEGATIVE</div>
-                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'var(--text)' }}>
+              <div className="text-xs font-bold text-text">Actual Healthy (0)</div>
+              <div className="bg-teal/15 border border-teal/30 rounded-lg p-3.5 text-center">
+                <div className="text-[10px] text-teal font-bold tracking-wider">TRUE NEG</div>
+                <div className="text-xl font-extrabold font-mono text-text mt-0.5">
                   {formatCMCell(activeCM.TN, actualHealthy)}
                 </div>
               </div>
-              <div
-                style={{
-                  background: 'rgba(251,113,133,0.1)',
-                  border: '1px solid rgba(251,113,133,0.3)',
-                  borderRadius: 8,
-                  padding: 16,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 10, color: '#FB7185', fontWeight: 700 }}>FALSE POSITIVE</div>
-                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'var(--text)' }}>
+              <div className="bg-rose-500/10 border border-rose-500/25 rounded-lg p-3.5 text-center">
+                <div className="text-[10px] text-rose-400 font-bold tracking-wider">FALSE POS</div>
+                <div className="text-xl font-extrabold font-mono text-text mt-0.5">
                   {formatCMCell(activeCM.FP, actualHealthy)}
                 </div>
               </div>
 
               {/* Row 2: Actual Disease */}
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                Actual Disease (1)
-              </div>
-              <div
-                style={{
-                  background: 'rgba(251,113,133,0.1)',
-                  border: '1px solid rgba(251,113,133,0.3)',
-                  borderRadius: 8,
-                  padding: 16,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 10, color: '#FB7185', fontWeight: 700 }}>FALSE NEGATIVE</div>
-                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'var(--text)' }}>
+              <div className="text-xs font-bold text-text">Actual Disease (1)</div>
+              <div className="bg-rose-500/10 border border-rose-500/25 rounded-lg p-3.5 text-center">
+                <div className="text-[10px] text-rose-400 font-bold tracking-wider">FALSE NEG</div>
+                <div className="text-xl font-extrabold font-mono text-text mt-0.5">
                   {formatCMCell(activeCM.FN, actualDisease)}
                 </div>
               </div>
-              <div
-                style={{
-                  background: 'rgba(45,212,191,0.18)',
-                  border: '1px solid rgba(45,212,191,0.4)',
-                  borderRadius: 8,
-                  padding: 16,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 10, color: 'var(--teal)', fontWeight: 700 }}>TRUE POSITIVE</div>
-                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'var(--text)' }}>
+              <div className="bg-teal/15 border border-teal/30 rounded-lg p-3.5 text-center">
+                <div className="text-[10px] text-teal font-bold tracking-wider">TRUE POS</div>
+                <div className="text-xl font-extrabold font-mono text-text mt-0.5">
                   {formatCMCell(activeCM.TP, actualDisease)}
                 </div>
               </div>
             </div>
 
             {/* Quick Metrics Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)', fontSize: 12 }}>
+            <div className="flex justify-around mt-4 pt-3 border-t border-border text-xs">
               <div>
-                <span style={{ color: 'var(--muted)' }}>Specificity (R0): </span>
-                <b style={{ color: 'var(--text)' }}>
+                <span className="text-muted">Specificity: </span>
+                <span className="font-bold text-text">
                   {actualHealthy > 0 ? `${((activeCM.TN / actualHealthy) * 100).toFixed(1)}%` : '0%'}
-                </b>
+                </span>
               </div>
               <div>
-                <span style={{ color: 'var(--muted)' }}>Sensitivity (R1): </span>
-                <b style={{ color: 'var(--text)' }}>
+                <span className="text-muted">Sensitivity: </span>
+                <span className="font-bold text-text">
                   {actualDisease > 0 ? `${((activeCM.TP / actualDisease) * 100).toFixed(1)}%` : '0%'}
-                </b>
+                </span>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Hyperparameter Stability Heatmap */}
+        {/* Hyperparameter Stability Table */}
         <Card>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-            Hyperparameter Stability Across Seeds
-          </h3>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
-            Config chosen by 5-fold CV grid search (or validation split for DNN) for each seed
+          <h3 className="text-base font-bold text-text mb-1">Hyperparameter Stability Across Seeds</h3>
+          <p className="text-xs text-muted mb-3">
+            Best configuration selected by 5-fold CV grid search per seed (or validation split for DNN)
           </p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full border-collapse text-xs">
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: '8px 6px', color: 'var(--muted)' }}>Model</th>
-                  <th style={{ padding: '8px 6px', color: 'var(--muted)' }}>Seed 42</th>
-                  <th style={{ padding: '8px 6px', color: 'var(--muted)' }}>Seed 43</th>
-                  <th style={{ padding: '8px 6px', color: 'var(--muted)' }}>Seed 44</th>
-                  <th style={{ padding: '8px 6px', color: 'var(--muted)' }}>Seed 45</th>
-                  <th style={{ padding: '8px 6px', color: 'var(--muted)' }}>Seed 46</th>
+                <tr className="border-b border-border bg-elevated/60 text-muted">
+                  <th className="py-2 px-2 text-left">Model</th>
+                  <th className="py-2 px-2 text-center">Seed 42</th>
+                  <th className="py-2 px-2 text-center">Seed 43</th>
+                  <th className="py-2 px-2 text-center">Seed 44</th>
+                  <th className="py-2 px-2 text-center">Seed 45</th>
+                  <th className="py-2 px-2 text-center">Seed 46</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/60">
                 {MODELS.map((m) => {
                   const mParams = params[m] || []
                   return (
-                    <tr key={m} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '8px 6px', fontWeight: 700, color: 'var(--text)' }}>{m}</td>
+                    <tr key={m} className="hover:bg-elevated/40">
+                      <td className="py-2 px-2 font-bold text-text">{m}</td>
                       {[42, 43, 44, 45, 46].map((seed) => {
                         const seedConfig = mParams.find((p) => p.seed === seed) || {}
                         const cleanPairs = Object.entries(seedConfig)
@@ -606,16 +428,7 @@ export default function Results() {
                           .join(', ')
 
                         return (
-                          <td
-                            key={seed}
-                            style={{
-                              padding: '8px 6px',
-                              fontFamily: 'JetBrains Mono',
-                              fontSize: 10,
-                              color: 'var(--muted)',
-                              lineHeight: 1.3,
-                            }}
-                          >
+                          <td key={seed} className="py-2 px-2 font-mono text-[10px] text-muted text-center leading-tight">
                             {cleanPairs || '-'}
                           </td>
                         )
@@ -626,95 +439,75 @@ export default function Results() {
               </tbody>
             </table>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12 }}>
-            <b>Observation:</b> SVM consistently selects <code style={{ color: 'var(--teal)' }}>C=1.0, rbf</code> across 4 of 5 seeds (linear only on seed 43). Random Forest always selects <code style={{ color: 'var(--teal)' }}>max_features=sqrt</code>.
+          <div className="text-[11px] text-muted mt-3">
+            <b>Observation:</b> SVM consistently selects <code className="text-teal">C=1.0, rbf</code> across 4 of 5 seeds (linear only on seed 43). Random Forest always selects <code className="text-teal">max_features=sqrt</code>.
           </div>
         </Card>
       </div>
 
       {/* DNN Training Convergence & Overfitting Analysis */}
       <Card>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2.5">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-text">
                 DNN Training Curves (Tuning Phase Validation Dynamics)
               </h3>
               {curveSeed === 44 && (
-                <Badge variant="danger">Catastrophic Overfitting Identified</Badge>
+                <Badge variant="danger">Overfitting Outlier Identified</Badge>
               )}
             </div>
-            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+            <p className="text-xs text-muted">
               Evaluated during hyperparameter selection on an 80:20 validation split of the training set (no early stopping)
             </p>
           </div>
 
           {/* Seed Selector & Metric Toggle */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 4 }}>
+          <div className="flex gap-3 items-center flex-wrap">
+            <div className="flex gap-1">
               {[42, 43, 44, 45, 46].map((s) => (
                 <button
                   key={s}
                   onClick={() => setCurveSeed(s)}
-                  style={{
-                    padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                    border: '1px solid',
-                    borderColor: curveSeed === s ? (s === 44 ? '#FB7185' : 'var(--teal)') : 'var(--border)',
-                    background: curveSeed === s ? (s === 44 ? 'rgba(251,113,133,0.15)' : 'rgba(45,212,191,0.15)') : 'transparent',
-                    color: curveSeed === s ? (s === 44 ? '#FB7185' : 'var(--teal)') : 'var(--muted)',
-                    cursor: 'pointer',
-                  }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
+                    curveSeed === s
+                      ? s === 44
+                        ? 'border-rose-500 bg-rose-500/15 text-rose-400'
+                        : 'border-teal bg-teal/15 text-teal'
+                      : 'border-border text-muted hover:text-text'
+                  }`}
                 >
                   Seed {s} {s === 44 ? '⚠' : ''}
                 </button>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                onClick={() => setCurveMetric('loss')}
-                style={{
-                  padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                  border: '1px solid',
-                  borderColor: curveMetric === 'loss' ? 'var(--amber)' : 'var(--border)',
-                  background: curveMetric === 'loss' ? 'rgba(245,158,11,0.15)' : 'transparent',
-                  color: curveMetric === 'loss' ? 'var(--amber)' : 'var(--muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                Loss
-              </button>
-              <button
-                onClick={() => setCurveMetric('accuracy')}
-                style={{
-                  padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                  border: '1px solid',
-                  borderColor: curveMetric === 'accuracy' ? 'var(--amber)' : 'var(--border)',
-                  background: curveMetric === 'accuracy' ? 'rgba(245,158,11,0.15)' : 'transparent',
-                  color: curveMetric === 'accuracy' ? 'var(--amber)' : 'var(--muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                Accuracy
-              </button>
-            </div>
+            <SegmentedControl
+              options={[
+                { value: 'loss', label: 'Loss' },
+                { value: 'accuracy', label: 'Accuracy' },
+              ]}
+              value={curveMetric}
+              onChange={(val) => setCurveMetric(val as 'loss' | 'accuracy')}
+              size="sm"
+            />
           </div>
         </div>
 
         {/* Selected Config Info */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 12, background: 'var(--elevated)', padding: '10px 14px', borderRadius: 8 }}>
+        <div className="flex gap-4 mb-4 text-xs bg-elevated p-2.5 rounded-xl border border-border">
           <div>
-            <span style={{ color: 'var(--muted)' }}>Chosen Architecture: </span>
-            <b style={{ color: 'var(--text)' }}>Batch={activeCurve?.best_config.batch}, LR={activeCurve?.best_config.lr}, Epochs={activeCurve?.best_config.epochs}</b>
+            <span className="text-muted">Chosen Architecture: </span>
+            <b className="text-text">Batch={activeCurve?.best_config.batch}, LR={activeCurve?.best_config.lr}, Epochs={activeCurve?.best_config.epochs}</b>
           </div>
           <div>
-            <span style={{ color: 'var(--muted)' }}>Selection Criterion: </span>
-            <span style={{ color: 'var(--amber)' }}>Last-epoch validation accuracy (no early stopping)</span>
+            <span className="text-muted">Selection Criterion: </span>
+            <span className="text-amber">Last-epoch validation accuracy (no early stopping)</span>
           </div>
         </div>
 
         {/* Line Chart */}
-        <div style={{ height: 280, width: '100%' }}>
+        <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={curveChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -737,18 +530,18 @@ export default function Results() {
           </ResponsiveContainer>
         </div>
 
-        {/* Annotation Box */}
+        {/* Dynamic Annotation Box for Seed 44 */}
         {curveSeed === 44 && (
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.3)', borderRadius: 8, fontSize: 13, lineHeight: 1.5 }}>
-            <div style={{ fontWeight: 700, color: '#FB7185', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs leading-relaxed space-y-1.5">
+            <div className="font-bold text-rose-400 flex items-center gap-1.5 text-sm">
               <AlertTriangle size={16} /> Detailed Finding: Seed 44 Validation Loss Divergence
             </div>
-            <div style={{ color: 'var(--text)' }}>
-              For seed 44, the grid search selected <code style={{ color: '#FB7185' }}>batch=16, lr=0.01, epochs=50</code> based on a lucky late-epoch validation accuracy spike (87.07% at epoch 50). However, examination of the loss curves shows that validation loss bottomed out at epoch 3 (0.323) and subsequently escalated by <b>+382% to 1.561</b>, while training accuracy climbed to ~99%.
-            </div>
-            <div style={{ color: 'var(--muted)', marginTop: 4 }}>
-              When refitted on the full training set without early stopping, this overfitted model achieved the worst DNN test accuracy (83.15%) and AUC (0.8771) across all seeds, substantially inflating the DNN replication standard deviation.
-            </div>
+            <p className="text-text">
+              For seed 44, the grid search selected <code className="text-rose-400 font-mono">batch={seed44Stats.batch}, lr={seed44Stats.lr}, epochs={seed44Stats.epochs}</code> based on last-epoch validation accuracy. While training loss declined smoothly, validation loss bottomed at epoch {seed44Stats.minEpoch} ({seed44Stats.minLoss}) and escalated by <b>+{seed44Stats.lossEscalationPct}% to {seed44Stats.maxLoss}</b> around epoch {seed44Stats.maxEpoch}, beginning its clear divergence after epoch ~12.
+            </p>
+            <p className="text-muted">
+              When evaluated on the held-out test split, this overfitted model achieved a test accuracy of <b>{seed44Stats.testAcc}%</b> (compared to the 5-seed mean of {seed44Stats.meanAcc}%) and AUC of <b>{seed44Stats.testAuc}</b>, which accounts for the high variance observed in the DNN replication metrics.
+            </p>
           </div>
         )}
       </Card>

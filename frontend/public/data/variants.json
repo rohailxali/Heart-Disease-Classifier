@@ -2,8 +2,8 @@
   "variant_a_dnn_early_stopping": {
     "title": "Variant A: DNN Early Stopping & Loss-Based Tuning",
     "description": "Applies tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True) and selects hyperparameter config by minimum validation loss instead of final-epoch accuracy.",
-    "hypothesis": "Eliminates catastrophic overfitting observed in Seed 44 (where val loss spiked from 0.32 to 1.56), stabilizing cross-seed variance.",
-    "status": "Documented protocol (TensorFlow required for execution)"
+    "hypothesis": "Designed to prevent late-epoch validation loss divergence observed during unconstrained training, stabilizing cross-seed variance.",
+    "status": "not_run"
   },
   "variant_b_median_imputation": {
     "title": "Variant B: Median Imputation of Zero Measurements",
@@ -181,6 +181,48 @@
         }
       }
     },
-    "status": "Executed across all 5 seeds"
+    "status": "executed",
+    "deltas_vs_baseline": {
+      "NB": {
+        "baseline_accuracy": 0.8609,
+        "variant_b_accuracy": 0.8522,
+        "delta_accuracy_pp": -0.87,
+        "baseline_auc": 0.9175,
+        "variant_b_auc": 0.9138,
+        "delta_auc_pp": -0.37
+      },
+      "DT": {
+        "baseline_accuracy": 0.8337,
+        "variant_b_accuracy": 0.8326,
+        "delta_accuracy_pp": -0.11,
+        "baseline_auc": 0.8995,
+        "variant_b_auc": 0.9027,
+        "delta_auc_pp": 0.32
+      },
+      "RF": {
+        "baseline_accuracy": 0.8685,
+        "variant_b_accuracy": 0.8652,
+        "delta_accuracy_pp": -0.33,
+        "baseline_auc": 0.9298,
+        "variant_b_auc": 0.9266,
+        "delta_auc_pp": -0.32
+      },
+      "SVM": {
+        "baseline_accuracy": 0.8717,
+        "variant_b_accuracy": 0.862,
+        "delta_accuracy_pp": -0.98,
+        "baseline_auc": 0.9307,
+        "variant_b_auc": 0.9294,
+        "delta_auc_pp": -0.12
+      },
+      "LR": {
+        "baseline_accuracy": 0.8696,
+        "variant_b_accuracy": 0.8685,
+        "delta_accuracy_pp": -0.11,
+        "baseline_auc": 0.9258,
+        "variant_b_auc": 0.9267,
+        "delta_auc_pp": 0.09
+      }
+    }
   }
 }

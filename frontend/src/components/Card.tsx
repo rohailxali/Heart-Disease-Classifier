@@ -5,19 +5,13 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   glow?: boolean
 }
 
-export function Card({ children, className = '', _glow = false, style, ...props }: CardProps & { _glow?: boolean }) {
+export function Card({ children, className = '', glow = false, style, ...props }: CardProps) {
   return (
     <div
-      className={`card-glow ${className}`}
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        padding: '20px',
-        position: 'relative',
-        transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
-        ...style,
-      }}
+      className={`bg-surface border border-border rounded-2xl p-5 relative transition-all duration-200 hover:border-slate-500/30 ${
+        glow ? 'card-glow' : ''
+      } ${className}`}
+      style={style}
       {...props}
     >
       {children}
@@ -25,39 +19,35 @@ export function Card({ children, className = '', _glow = false, style, ...props 
   )
 }
 
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  children: React.ReactNode
+  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'paper' | 'mine'
+}
+
 export function Badge({
   children,
   variant = 'default',
-}: {
-  children: React.ReactNode
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'paper' | 'mine'
-}) {
-  const styles: Record<string, { bg: string; color: string; border: string }> = {
-    default: { bg: 'rgba(148,163,184,0.12)', color: 'var(--text)', border: 'rgba(148,163,184,0.2)' },
-    success: { bg: 'rgba(52,211,153,0.12)', color: '#34D399', border: 'rgba(52,211,153,0.3)' },
-    warning: { bg: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: 'rgba(245,158,11,0.3)' },
-    danger:  { bg: 'rgba(251,113,133,0.12)', color: '#FB7185', border: 'rgba(251,113,133,0.3)' },
-    info:    { bg: 'rgba(45,212,191,0.12)', color: '#2DD4BF', border: 'rgba(45,212,191,0.3)' },
-    paper:   { bg: 'rgba(127,166,214,0.15)', color: '#7FA6D6', border: 'rgba(127,166,214,0.3)' },
-    mine:    { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: 'rgba(245,158,11,0.3)' },
+  className = '',
+  style,
+  ...props
+}: BadgeProps) {
+  const variantClasses: Record<string, string> = {
+    default: 'bg-slate-400/10 text-slate-300 border-slate-400/20',
+    success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    warning: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    danger:  'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    info:    'bg-teal/10 text-teal border-teal/30',
+    paper:   'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    mine:    'bg-amber-500/15 text-amber-300 border-amber-500/30',
   }
-  const s = styles[variant] || styles.default
+
+  const selectedClass = variantClasses[variant] || variantClasses.default
 
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '2px 8px',
-        fontSize: '11px',
-        fontWeight: 600,
-        borderRadius: '6px',
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-        lineHeight: 1.4,
-        letterSpacing: '0.01em',
-      }}
+      className={`inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-md border leading-tight tracking-wide ${selectedClass} ${className}`}
+      style={style}
+      {...props}
     >
       {children}
     </span>

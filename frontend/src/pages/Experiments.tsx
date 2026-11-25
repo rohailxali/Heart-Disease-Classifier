@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FlaskConical, ShieldAlert } from 'lucide-react'
+import { FlaskConical, ShieldAlert, Info } from 'lucide-react'
 import { Card, Badge } from '../components/Card'
 import { useData } from '../useData'
 import { fmtPct, fmtAUC, MODEL_LABELS } from '../utils'
@@ -11,6 +11,15 @@ interface VariantsData {
     description: string
     hypothesis: string
     status: string
+    models?: Record<string, Record<string, { mean: number; std: number }>>
+    deltas_vs_baseline?: Record<string, {
+      baseline_accuracy: number
+      variant_a_accuracy: number
+      delta_accuracy_pp: number
+      baseline_auc: number
+      variant_a_auc: number
+      delta_auc_pp: number
+    }>
   }
   variant_b_median_imputation: {
     title: string
@@ -18,6 +27,14 @@ interface VariantsData {
     hypothesis: string
     status: string
     models: Record<string, Record<string, { mean: number; std: number }>>
+    deltas_vs_baseline?: Record<string, {
+      baseline_accuracy: number
+      variant_b_accuracy: number
+      delta_accuracy_pp: number
+      baseline_auc: number
+      variant_b_auc: number
+      delta_auc_pp: number
+    }>
   }
 }
 
@@ -29,7 +46,10 @@ export default function Experiments() {
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/variants.json`)
       .then((res) => {
-        if (!res.ok) throw new Error('variants.json not available')
+        const ct = res.headers.get('content-type') || ''
+        if (!res.ok || !ct.includes('application/json')) {
+          throw new Error('variants.json not available or not json')
+        }
         return res.json()
       })
       .then((v) => {
@@ -42,16 +62,16 @@ export default function Experiments() {
   }, [])
 
   if (loading) {
-    return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading experimental variants...</div>
+    return <div className="p-8 text-muted">Loading experimental variants...</div>
   }
 
   if (!variants) {
     return (
-      <div style={{ maxWidth: 800, margin: '40px auto', padding: 24, textAlign: 'center' }}>
-        <FlaskConical size={48} color="var(--muted)" style={{ marginBottom: 16 }} />
-        <h3 style={{ fontSize: 18, color: 'var(--text)', marginBottom: 8 }}>No Experimental Variants Generated</h3>
-        <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
-          Run <code style={{ color: 'var(--teal)' }}>python improve_heart.py</code> to execute the bonus experimental variants (Early Stopping & Median Imputation).
+      <div className="max-w-2xl mx-auto my-12 p-6 text-center">
+        <FlaskConical size={48} className="text-muted mx-auto mb-4" />
+        <h3 className="text-lg font-bold text-text mb-2">No Experimental Variants Available</h3>
+        <p className="text-sm text-muted leading-relaxed">
+          Experimental variant results could not be loaded. Ensure <code className="text-teal font-mono">results_variants/</code> data has been generated.
         </p>
       </div>
     )
@@ -61,105 +81,97 @@ export default function Experiments() {
   const varA = variants.variant_a_dnn_early_stopping
 
   return (
-    <div style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 20px 48px' }}>
+    <div className="max-w-[1240px] mx-auto px-5 py-6">
       {/* Prominent Header */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-7">
+        <div className="flex gap-2 items-center mb-2">
           <Badge variant="mine">Methodological Bonus</Badge>
           <Badge variant="warning">Supplementary Investigation</Badge>
         </div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', margin: '0 0 8px' }}>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight mb-2">
           Experimental Exploration: Model Improvement Variants
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, maxWidth: 880 }}>
+        <p className="text-sm text-muted max-w-3xl leading-relaxed">
           Independent exploratory experiments addressing data artifacts and deep learning instability identified during replication.
         </p>
       </motion.div>
 
       {/* Strict Separation Notice */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '14px 18px',
-          background: 'rgba(245,158,11,0.08)',
-          border: '1px solid rgba(245,158,11,0.25)',
-          borderRadius: 8,
-          marginBottom: 28,
-          fontSize: 13,
-          color: 'var(--text)',
-        }}
-      >
-        <ShieldAlert size={20} color="var(--amber)" style={{ flexShrink: 0 }} />
+      <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-7 text-xs sm:text-sm text-text">
+        <ShieldAlert size={20} className="text-amber flex-shrink-0" />
         <div>
-          <b>Protocol Integrity Notice:</b> These variants are strictly supplementary and evaluated in <code style={{ color: 'var(--amber)' }}>results_variants/</code>. They do <b>NOT</b> alter or replace the paper-faithful replication numbers recorded in <code style={{ color: 'var(--teal)' }}>results_heart/</code>.
+          <b>Protocol Integrity Notice:</b> These variants are strictly supplementary and evaluated in <code className="text-amber font-mono">results_variants/</code>. They do <b>NOT</b> alter or replace the paper-faithful replication numbers recorded in <code className="text-teal font-mono">results_heart/</code>.
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div className="space-y-7">
         {/* Variant B: Median Imputation */}
-        <Card style={{ borderLeft: '4px solid var(--teal)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+        <Card className="border-l-4 border-l-teal">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="text-lg font-bold text-text">
               {varB.title}
             </h3>
             <Badge variant="success">Executed (5 Seeds)</Badge>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
+          <p className="text-sm text-muted leading-relaxed mb-4">
             {varB.description}
           </p>
 
-          <div style={{ background: 'var(--elevated)', padding: '12px 16px', borderRadius: 8, marginBottom: 18, fontSize: 13 }}>
-            <span style={{ color: 'var(--muted)' }}><b>Hypothesis:</b> </span>
-            <span style={{ color: 'var(--text)' }}>{varB.hypothesis}</span>
+          <div className="bg-elevated p-3.5 rounded-xl mb-5 text-xs sm:text-sm border border-border">
+            <span className="text-muted font-bold">Hypothesis: </span>
+            <span className="text-text">{varB.hypothesis}</span>
           </div>
 
           {/* Comparison Table: Paper-Faithful vs Imputed Variant B */}
           {varB.models && data && (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
+              <div className="text-sm font-bold text-text mb-2.5">
                 Performance Comparison: Paper-Faithful Replication vs. Imputed Variant B
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 640 }}>
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--muted)' }}>Model</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--muted)' }}>Paper-Faithful Acc</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--teal)' }}>Variant B (Imputed) Acc</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--muted)' }}>Acc Change</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--muted)' }}>Paper-Faithful AUC</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--teal)' }}>Variant B (Imputed) AUC</th>
+                    <tr className="border-b border-border bg-elevated/60 text-muted">
+                      <th className="py-2.5 px-3 text-left">Model</th>
+                      <th className="py-2.5 px-3 text-center">Paper-Faithful Acc</th>
+                      <th className="py-2.5 px-3 text-center text-teal">Variant B Acc</th>
+                      <th className="py-2.5 px-3 text-center">Acc Change</th>
+                      <th className="py-2.5 px-3 text-center">Paper-Faithful AUC</th>
+                      <th className="py-2.5 px-3 text-center text-teal">Variant B AUC</th>
+                      <th className="py-2.5 px-3 text-center">AUC Change</th>
                     </tr>
                   </thead>
                   <tbody>
                     {['NB', 'DT', 'RF', 'SVM', 'LR'].map((m) => {
-                      const faithfulAcc = (data.results[m]?.stats.accuracy?.mean ?? 0)
-                      const faithfulAuc = (data.results[m]?.stats.auc?.mean ?? 0)
+                      const faithfulAcc = data.results[m]?.stats.accuracy?.mean ?? 0
+                      const faithfulAuc = data.results[m]?.stats.auc?.mean ?? 0
                       const vbAcc = varB.models[m]?.accuracy?.mean ?? 0
                       const vbAuc = varB.models[m]?.auc?.mean ?? 0
                       const diffAcc = vbAcc - faithfulAcc
+                      const diffAuc = vbAuc - faithfulAuc
 
                       return (
-                        <tr key={m} style={{ borderBottom: '1px solid var(--border)', fontFamily: 'JetBrains Mono' }}>
-                          <td style={{ padding: '9px 10px', fontWeight: 700, color: 'var(--text)', fontFamily: 'Inter' }}>
-                            {m} ({MODEL_LABELS[m]})
+                        <tr key={m} className="border-b border-border/60 hover:bg-elevated/40">
+                          <td className="py-2.5 px-3 font-bold text-text">
+                            {m} <span className="font-normal text-muted">({MODEL_LABELS[m]})</span>
                           </td>
-                          <td style={{ padding: '9px 10px', textAlign: 'center', color: '#F59E0B' }}>
+                          <td className="py-2.5 px-3 text-center font-mono text-amber">
                             {fmtPct(faithfulAcc)}
                           </td>
-                          <td style={{ padding: '9px 10px', textAlign: 'center', color: 'var(--teal)', fontWeight: 700 }}>
+                          <td className="py-2.5 px-3 text-center font-mono text-teal font-bold">
                             {fmtPct(vbAcc)}
                           </td>
-                          <td style={{ padding: '9px 10px', textAlign: 'center', color: diffAcc >= 0 ? '#34D399' : '#FB7185' }}>
+                          <td className={`py-2.5 px-3 text-center font-mono font-semibold ${diffAcc >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {diffAcc >= 0 ? '+' : ''}{(diffAcc * 100).toFixed(2)} pp
                           </td>
-                          <td style={{ padding: '9px 10px', textAlign: 'center', color: '#F59E0B' }}>
+                          <td className="py-2.5 px-3 text-center font-mono text-amber">
                             {fmtAUC(faithfulAuc)}
                           </td>
-                          <td style={{ padding: '9px 10px', textAlign: 'center', color: 'var(--teal)', fontWeight: 700 }}>
+                          <td className="py-2.5 px-3 text-center font-mono text-teal font-bold">
                             {fmtAUC(vbAuc)}
+                          </td>
+                          <td className={`py-2.5 px-3 text-center font-mono font-semibold ${diffAuc >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {diffAuc >= 0 ? '+' : ''}{(diffAuc * 100).toFixed(2)} pp
                           </td>
                         </tr>
                       )
@@ -167,26 +179,40 @@ export default function Experiments() {
                   </tbody>
                 </table>
               </div>
+              <div className="text-xs text-muted mt-3">
+                <b>Finding:</b> Test accuracy shifts by only ~0.1 to ~1.0 percentage points when zero cholesterol is imputed, demonstrating that other physiological variables carry robust diagnostic signal, even while individual patient predictions shift when zero is forced.
+              </div>
             </div>
           )}
         </Card>
 
         {/* Variant A: DNN Early Stopping */}
-        <Card style={{ borderLeft: '4px solid var(--amber)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+        <Card className="border-l-4 border-l-amber">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="text-lg font-bold text-text">
               {varA.title}
             </h3>
-            <Badge variant="warning">{varA.status}</Badge>
+            <Badge variant={varA.status === 'executed' ? 'success' : 'default'}>
+              {varA.status === 'executed' ? 'Executed' : 'Not run (requires TensorFlow)'}
+            </Badge>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
+          <p className="text-sm text-muted leading-relaxed mb-4">
             {varA.description}
           </p>
-          <div style={{ background: 'var(--elevated)', padding: '12px 16px', borderRadius: 8, fontSize: 13 }}>
-            <span style={{ color: 'var(--muted)' }}><b>Key Diagnostic Finding:</b> </span>
-            <span style={{ color: 'var(--text)' }}>
-              In the paper-faithful setup, DNN hyperparameters are selected purely by validation accuracy at the final epoch. For Seed 44, validation loss bottomed at epoch 3 (0.32) and rose to 1.56 by epoch 50. Implementing <code style={{ color: 'var(--teal)' }}>EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)</code> halts training at epoch 13, preserving generalized representations and preventing catastrophic overfitting.
-            </span>
+
+          <div className="bg-elevated p-3.5 rounded-xl text-xs sm:text-sm border border-border space-y-2">
+            <div className="flex items-center gap-2 font-bold text-text">
+              <Info size={16} className="text-teal" />
+              <span>Diagnostic Protocol & Rationale:</span>
+            </div>
+            <p className="text-muted leading-relaxed">
+              In the paper-faithful setup, DNN hyperparameters were chosen by last-epoch validation accuracy on an unconstrained 50-epoch schedule. This setup permitted late-epoch loss divergence during cross-seed tuning (e.g. Seed 44 validation loss ascending from its minimum).
+            </p>
+            <p className="text-muted leading-relaxed">
+              {varA.status === 'executed'
+                ? 'Variant A was executed across all 5 seeds, applying EarlyStopping(patience=10) and selecting hyperparameter configurations by minimum validation loss.'
+                : 'Status: Not run in this runtime environment (TensorFlow is not present). The documented protocol specifies tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True) with configuration selection by minimum validation loss.'}
+            </p>
           </div>
         </Card>
       </div>

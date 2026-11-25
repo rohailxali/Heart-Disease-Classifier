@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: heart-disease-replication
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-api.txt && cd frontend && npm install && npm run build && cd .. && python api/train_models.py --skip-dnn
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SERVE_FRONTEND
+        value: "1"
+      - key: ALLOWED_ORIGINS
+        value: "*"

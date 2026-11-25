@@ -1,6 +1,9 @@
 """
 api/main.py - FastAPI application for live heart disease risk prediction.
 """
+import os
+import sys
+import logging
 from pathlib import Path
 import json
 import random
@@ -11,13 +14,20 @@ from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 import pandas as pd
 import numpy as np
 import joblib
+import sklearn
 
 _HERE = Path(__file__).resolve().parent
+PROJECT_ROOT = _HERE.parent
 MODELS_DIR = _HERE / "models"
+DATA_PATH = PROJECT_ROOT / "heart.csv"
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("api")
 
 app = FastAPI(
     title="Heart Disease Classification API",
@@ -26,15 +36,13 @@ app = FastAPI(
 )
 
 # CORS configuration
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+allowed_origins = [orig.strip() for orig in allowed_origins_env.split(",") if orig.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "*"
-    ],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -104,7 +112,10 @@ def load_all_models():
     for name in ["NB", "DT", "RF", "SVM", "LR"]:
         p = MODELS_DIR / f"{name}.joblib"
         if p.exists():
-            models[name] = joblib.load(p)
+            try:
+                models[name] = joblib.load(p)
+            except Exception as e:
+                logger.error(f"Failed to load {p}: {e}")
 
     # Check for DNN
     dnn_path = MODELS_DIR / "DNN.keras"
@@ -123,7 +134,41 @@ def load_all_models():
         with open(samples_path, "r") as f:
             test_samples = json.load(f)
 
+    if not models:
+        logger.warning("Models not found. Run 'python api/train_models.py' to train and save models.")
+
 load_all_models()
+
+# Dynamically compute zero-cholesterol count and disease rate from heart.csv
+chol_zero_count = 172
+chol_zero_disease_rate = 88.4
+if DATA_PATH.exists():
+    try:
+        _df = pd.read_csv(DATA_PATH)
+        _chol_zeros = _df[_df["Cholesterol"] == 0]
+        chol_zero_count = int(len(_chol_zeros))
+        if chol_zero_count > 0:
+            chol_zero_disease_rate = round(float(_chol_zeros["HeartDisease"].mean() * 100), 1)
+    except Exception as e:
+        logger.warning(f"Could not compute cholesterol statistics from heart.csv: {e}")
+
+chol_zero_note = (
+    f"Dataset codes missing values as 0. {chol_zero_count} patients have Cholesterol=0, "
+    f"which heavily correlates with heart disease ({chol_zero_disease_rate}% disease rate)."
+)
+
+@app.get("/api")
+def get_service_info():
+    return {
+        "service": "Heart Disease Classification API",
+        "description": "Replication of Simanjuntak et al. (JAIC 2025)",
+        "version": "1.0.0",
+        "status": "online",
+        "docs_url": "/docs",
+        "openapi_url": "/openapi.json",
+        "health_endpoint": "/api/health",
+        "predict_endpoint": "/api/predict"
+    }
 
 @app.get("/api/health")
 def get_health():
@@ -132,7 +177,8 @@ def get_health():
         "models_loaded": list(models.keys()),
         "dnn_available": dnn_model is not None,
         "test_samples_count": len(test_samples),
-        "seed": 42
+        "seed": 42,
+        "sklearn_version": sklearn.__version__
     }
 
 @app.get("/api/schema")
@@ -194,7 +240,7 @@ def get_schema():
                 "default": 223,
                 "step": 1,
                 "unit": "mg/dl",
-                "zero_note": "Dataset codes missing values as 0. 172 patients have Cholesterol=0, which heavily correlates with heart disease (88.4% disease rate).",
+                "zero_note": chol_zero_note,
                 "description": "Serum cholesterol in mg/dl"
             },
             {
@@ -279,7 +325,10 @@ def get_samples(n: int = Query(1, ge=1, le=20)):
 @app.post("/api/predict")
 def predict_heart_disease(patient: PatientInput):
     if not models:
-        raise HTTPException(status_code=503, detail="Models are not initialized")
+        raise HTTPException(
+            status_code=503,
+            detail="Models not loaded. Please run 'python api/train_models.py' first."
+        )
 
     row = {
         "Age": patient.Age,
@@ -359,3 +408,13 @@ def predict_heart_disease(patient: PatientInput):
         "input_features": row,
         "disclaimer": "Educational demonstration reproducing Simanjuntak et al. (2025). This interface is NOT a certified medical diagnostic device and should never replace clinical judgment."
     }
+
+# Mount frontend static files after all API routes if SERVE_FRONTEND=1
+if os.environ.get("SERVE_FRONTEND") == "1" and (PROJECT_ROOT / "frontend" / "dist").exists():
+    dist_path = PROJECT_ROOT / "frontend" / "dist"
+    logger.info(f"Mounting static frontend files from {dist_path}")
+    app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="frontend")
+else:
+    @app.get("/")
+    def get_root_info():
+        return get_service_info()

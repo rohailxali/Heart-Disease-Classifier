@@ -8,3 +8,5 @@ api/models/
 *.egg-info/
 .DS_Store
 Thumbs.db
+*.tsbuildinfo
+screenshots/

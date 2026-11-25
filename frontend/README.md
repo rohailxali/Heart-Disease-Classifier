@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# Heart Disease ML Replication Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+An interactive, accessible React dashboard visualizing the empirical reproduction of **Simanjuntak et al. (JAIC 2025)**: *"A Comparative Study of ML and DL Models for Heart Disease Classification"*.
 
-Currently, two official plugins are available:
+## Architecture & Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Static-First Core**: Fully operable from precomputed JSON files in `public/data/` (no server required for benchmarking, exploratory data analysis, or methodology reports).
+- **Interactive Risk Predictor**: Connects dynamically to the FastAPI live prediction service via `/api/predict` and `/api/samples`, gracefully reporting offline status with a server wake-up poll when the backend is asleep.
+- **Accessible Design**: Built with Tailwind CSS, supporting dark/light mode with zero flash on load, WCAG AA contrast standards, keyboard-sortable data tables, and full screen-reader accessibility.
+- **Optimized Bundle**: Dynamic code-splitting with `React.lazy`, manual vendor chunking for Recharts, Framer Motion, and Lucide icons, ensuring initial gzipped JavaScript stays well under 250 KB.
 
-## React Compiler
+## Quick Start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+### 1. Development Mode
+```bash
+npm install
+npm run dev
 ```
+The dashboard starts at `http://localhost:5173`. In development mode, Vite automatically proxies `/api` requests to `http://127.0.0.1:8000`.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### 2. Connect to the Live Prediction Backend
+In a separate terminal:
+```bash
+npm run api
+```
+*(Starts Uvicorn serving `api.main:app` on port 8000).*
+
+### 3. Build for Production
+```bash
+npm run build
+```
+Generates a static production bundle in `dist/`, ready for zero-configuration deployment to Netlify, Vercel, GitHub Pages, or Docker.
+
+### 4. Code Quality & Linting
+```bash
+npm run lint
+```
+Runs `oxlint` across all TypeScript and React source files.

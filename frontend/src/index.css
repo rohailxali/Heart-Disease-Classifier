@@ -1,5 +1,5 @@
-@import "@fontsource/inter/index.css";
-@import "@fontsource/jetbrains-mono/index.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 
 @tailwind base;
 @tailwind components;
@@ -32,7 +32,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
-  height: 100%;
+  min-height: 100%;
   font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
   background-color: var(--bg);
   color: var(--text);

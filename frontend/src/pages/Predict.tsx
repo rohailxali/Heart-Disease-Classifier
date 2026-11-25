@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Activity, RefreshCw, CheckCircle2, XCircle,
-  Server, Play, ShieldAlert, Sparkles, UserCheck
+  Activity, RefreshCw, Server, Play, ShieldAlert, UserCheck
 } from 'lucide-react'
 import { Card, Badge } from '../components/Card'
+import { Button } from '../components/Button'
 import { MODEL_LABELS } from '../utils'
+import {
+  checkApiHealth,
+  fetchApiSamples,
+  postPrediction,
+  ApiHealthResponse
+} from '../api'
 
 interface PredictionResult {
   ensemble: {
@@ -23,10 +29,11 @@ interface PredictionResult {
     label: string
     available: boolean
   }>
-  input_features: Record<string, any>
+  input_features: Record<string, unknown>
   disclaimer: string
 }
 
+// Initial values set to dataset medians/modes (not a typical patient)
 const DEFAULT_PATIENT = {
   Age: 54,
   Sex: 'M',
@@ -47,33 +54,86 @@ export default function Predict() {
   const [prevNonzeroChol, setPrevNonzeroChol] = useState(223)
 
   const [loading, setLoading] = useState(false)
+  const [apiHealth, setApiHealth] = useState<ApiHealthResponse | null>(null)
   const [apiOnline, setApiOnline] = useState<boolean | null>(null)
+  const [wakingUp, setWakingUp] = useState(false)
+  const [wakeElapsed, setWakeElapsed] = useState(0)
   const [result, setResult] = useState<PredictionResult | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Held-out test patient state
   const [heldOutPatient, setHeldOutPatient] = useState<{ trueLabel: number } | null>(null)
 
-  // Check API health on mount
-  const checkHealth = async () => {
+  const pollIntervalRef = useRef<number | null>(null)
+  const pollTimerRef = useRef<number | null>(null)
+
+  // Check health and manage waking polling
+  const startHealthCheck = async () => {
     try {
-      const res = await fetch('/api/health')
-      if (res.ok) {
-        setApiOnline(true)
-      } else {
-        setApiOnline(false)
-      }
+      const health = await checkApiHealth()
+      setApiHealth(health)
+      setApiOnline(true)
+      setWakingUp(false)
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
     } catch {
       setApiOnline(false)
     }
   }
 
+  const startWakingPoll = () => {
+    setWakingUp(true)
+    setWakeElapsed(0)
+    setErrorMsg(null)
+
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+
+    const startTime = Date.now()
+    pollTimerRef.current = window.setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      setWakeElapsed(elapsed)
+      if (elapsed >= 90) {
+        clearInterval(pollTimerRef.current!)
+        clearInterval(pollIntervalRef.current!)
+        setWakingUp(false)
+        setErrorMsg('Server wake-up timed out after 90 seconds. Please check backend status.')
+      }
+    }, 1000)
+
+    pollIntervalRef.current = window.setInterval(async () => {
+      try {
+        const health = await checkApiHealth()
+        if (health.status === 'healthy') {
+          setApiHealth(health)
+          setApiOnline(true)
+          setWakingUp(false)
+          clearInterval(pollTimerRef.current!)
+          clearInterval(pollIntervalRef.current!)
+        }
+      } catch {
+        // Continue polling
+      }
+    }, 3000)
+  }
+
   useEffect(() => {
-    let active = true
-    fetch('/api/health')
-      .then(res => { if (active) setApiOnline(res.ok) })
-      .catch(() => { if (active) setApiOnline(false) })
-    return () => { active = false }
+    let isMounted = true
+    checkApiHealth()
+      .then(health => {
+        if (isMounted) {
+          setApiHealth(health)
+          setApiOnline(true)
+        }
+      })
+      .catch(() => {
+        if (isMounted) setApiOnline(false)
+      })
+    return () => {
+      isMounted = false
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+    }
   }, [])
 
   // Handle cholesterol zero toggle
@@ -92,9 +152,7 @@ export default function Predict() {
     setLoading(true)
     setErrorMsg(null)
     try {
-      const res = await fetch('/api/samples?n=1')
-      if (!res.ok) throw new Error('Failed to fetch test sample')
-      const data = await res.json()
+      const data = await fetchApiSamples(1)
       if (data.samples && data.samples.length > 0) {
         const sample = data.samples[0]
         const { HeartDisease, ...features } = sample
@@ -106,8 +164,8 @@ export default function Predict() {
         // Automatically predict for this sample
         await executePrediction(features)
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Could not load test sample')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not load test sample')
     } finally {
       setLoading(false)
     }
@@ -118,19 +176,10 @@ export default function Predict() {
     setLoading(true)
     setErrorMsg(null)
     try {
-      const res = await fetch('/api/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inputData),
-      })
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}))
-        throw new Error(errJson.detail || `Prediction failed (${res.status})`)
-      }
-      const data = await res.json()
+      const data = await postPrediction(inputData)
       setResult(data)
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error communicating with prediction server')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error communicating with prediction server')
     } finally {
       setLoading(false)
     }
@@ -139,10 +188,11 @@ export default function Predict() {
   // SVG Gauge Component
   const renderGauge = (probability: number) => {
     const color = probability > 0.5 ? '#FB7185' : '#2DD4BF'
+    const angle = (probability * 180) - 90 // -90 to +90 degrees
 
     return (
-      <div style={{ position: 'relative', width: 220, height: 125, margin: '0 auto' }}>
-        <svg viewBox="0 0 200 115" width="100%" height="100%">
+      <div className="relative w-[220px] h-[125px] mx-auto">
+        <svg viewBox="0 0 200 115" className="w-full h-full">
           {/* Background Track */}
           <path
             d="M 20 100 A 80 80 0 0 1 180 100"
@@ -151,623 +201,466 @@ export default function Predict() {
             strokeWidth="16"
             strokeLinecap="round"
           />
-          {/* Active Gradient Arc */}
+          {/* Active Arc */}
           <path
             d="M 20 100 A 80 80 0 0 1 180 100"
             fill="none"
             stroke={color}
             strokeWidth="16"
             strokeLinecap="round"
-            strokeDasharray="251.2"
-            strokeDashoffset={251.2 * (1 - probability)}
-            style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.4s ease' }}
+            strokeDasharray="251.32"
+            strokeDashoffset={251.32 * (1 - probability)}
+            style={{ transition: 'stroke-dashoffset 0.6s ease' }}
           />
-          {/* Center Text */}
-          <text x="100" y="88" textAnchor="middle" fill="var(--text)" fontSize="26" fontWeight="800" fontFamily="JetBrains Mono">
-            {(probability * 100).toFixed(1)}%
-          </text>
-          <text x="100" y="106" textAnchor="middle" fill="var(--muted)" fontSize="11" fontWeight="600">
-            ENSEMBLE RISK
-          </text>
+          {/* Needle Center Pin */}
+          <circle cx="100" cy="100" r="6" fill="var(--text)" />
+          {/* Needle */}
+          <line
+            x1="100"
+            y1="100"
+            x2="100"
+            y2="32"
+            stroke="var(--text)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            transform={`rotate(${angle} 100 100)`}
+            style={{ transition: 'transform 0.6s ease' }}
+          />
         </svg>
+        <div className="absolute bottom-1 inset-x-0 text-center font-mono font-extrabold text-2xl text-text">
+          {(probability * 100).toFixed(1)}%
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 20px 48px' }}>
+    <div className="max-w-[1240px] mx-auto px-5 py-6">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-          <Badge variant="info">Live Inference Engine</Badge>
-          <Badge variant={apiOnline ? 'success' : 'warning'}>
-            {apiOnline ? 'FastAPI Online' : 'API Standby'}
-          </Badge>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-7">
+        <div className="flex gap-2 items-center mb-2 flex-wrap">
+          <Badge variant="info">Live Diagnostic Predictor</Badge>
+          <Badge variant="default">Seed 42 Models</Badge>
+          {apiOnline === true ? (
+            <Badge variant="success">
+              {apiHealth?.dnn_available ? 'All 6 Models Live' : '5 of 6 models live; DNN is not served in this deployment'}
+            </Badge>
+          ) : (
+            <Badge variant="danger">API Offline</Badge>
+          )}
         </div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', margin: '0 0 8px' }}>
-          Interactive Patient Risk Predictor
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight mb-2">
+          Interactive Patient Risk Predictor & Consensus
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, maxWidth: 880 }}>
-          Live inference powered by pipelines trained on the seed-42 split. Test clinical attribute combinations or evaluate real held-out test patients with instant ground-truth verification.
+        <p className="text-sm text-muted max-w-3xl leading-relaxed">
+          Test clinical patient inputs across all 6 models trained on the seed-42 split. Inspect individual model probabilities, ensemble voting consensus, and sensitivity to the zero-cholesterol artifact.
         </p>
       </motion.div>
 
-      {/* Permanent Medical Advice Disclaimer */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '12px 16px',
-          background: 'rgba(245,158,11,0.08)',
-          border: '1px solid rgba(245,158,11,0.25)',
-          borderRadius: 8,
-          marginBottom: 24,
-          fontSize: 13,
-          color: 'var(--text)',
-        }}
-      >
-        <ShieldAlert size={18} color="var(--amber)" style={{ flexShrink: 0 }} />
-        <span>
-          <b>Educational Demonstration Only:</b> This machine learning tool is an academic replication of Simanjuntak et al. (2025). It is not certified for clinical diagnosis and must never be used as a substitute for professional medical judgment.
-        </span>
-      </div>
-
-      {/* API Offline Banner if offline */}
+      {/* Offline / Waking Banner if API is down */}
       {apiOnline === false && (
-        <Card style={{ marginBottom: 28, border: '1px solid rgba(251,113,133,0.3)', background: 'var(--elevated)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-            <Server size={24} color="#FB7185" style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                FastAPI Predictor Server is Offline
+        <Card className="mb-6 border-amber/40 bg-amber-500/10 p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <Server size={22} className="text-amber flex-shrink-0" />
+              <div>
+                <div className="text-sm font-bold text-text">
+                  {wakingUp ? `Waking predictor server... (${wakeElapsed}s / 90s)` : 'Predictor API is offline or sleeping'}
+                </div>
+                <div className="text-xs text-muted">
+                  {wakingUp
+                    ? 'Free hosting spins down when idle. Polling health endpoint...'
+                    : 'Start the API with `npm run api` or click Wake Server to poll if hosted on a free tier.'}
+                </div>
               </div>
-              <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 12 }}>
-                To enable live predictions and held-out test patient sampling, start the backend uvicorn service in your terminal:
-              </p>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <pre style={{ margin: 0, padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, fontSize: 12, fontFamily: 'JetBrains Mono', color: 'var(--teal)' }}>
-                  npm run api
-                </pre>
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>or</span>
-                <pre style={{ margin: 0, padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, fontSize: 12, fontFamily: 'JetBrains Mono', color: 'var(--teal)' }}>
-                  python -m uvicorn api.main:app --reload --port 8000
-                </pre>
-                <button
-                  onClick={checkHealth}
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    background: 'var(--teal)',
-                    color: '#0A0F1C',
-                    border: 'none',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Check Connection Again
-                </button>
-              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={startHealthCheck}
+              >
+                <RefreshCw size={14} className="mr-1.5" />
+                Quick Check
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={wakingUp}
+                onClick={startWakingPoll}
+              >
+                {wakingUp ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin mr-1.5" />
+                    Waking Server...
+                  </>
+                ) : (
+                  'Wake Server'
+                )}
+              </Button>
             </div>
           </div>
         </Card>
       )}
 
-      {/* Error Message banner if any */}
       {errorMsg && (
-        <div style={{ padding: '10px 14px', background: 'rgba(251,113,133,0.1)', border: '1px solid rgba(251,113,133,0.3)', borderRadius: 8, color: '#FB7185', fontSize: 13, marginBottom: 16 }}>
-          {errorMsg}
+        <div className="p-3.5 mb-6 bg-rose-500/15 border border-rose-500/30 rounded-xl text-xs text-rose-300">
+          <b>Notice:</b> {errorMsg}
         </div>
       )}
 
-      {/* Main Grid: Form Inputs (Left) and Risk Gauge Results (Right) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 24, marginBottom: 32 }}>
-        {/* Left Column: Form Controls */}
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-                Patient Attributes
-              </h3>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                Tune clinical measurements or sample a benchmark patient
-              </p>
-            </div>
-
-            <button
-              onClick={loadRandomPatient}
-              disabled={loading || apiOnline === false}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '7px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 6,
-                border: '1px solid var(--teal)',
-                background: 'rgba(45,212,191,0.12)',
-                color: 'var(--teal)',
-                cursor: loading || apiOnline === false ? 'not-allowed' : 'pointer',
-                opacity: apiOnline === false ? 0.5 : 1,
-              }}
-            >
-              <Sparkles size={14} />
-              Load Random Test Patient
-            </button>
-          </div>
-
-          {/* Held-out Patient Notice if loaded */}
-          {heldOutPatient && (
-            <div style={{ padding: '10px 14px', background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 18, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text)' }}>
-                <UserCheck size={16} color="var(--teal)" />
-                <span>Loaded patient from <b>Seed 42 Test Split (N=184)</b></span>
-              </div>
-              <Badge variant={heldOutPatient.trueLabel === 1 ? 'danger' : 'success'}>
-                Actual: {heldOutPatient.trueLabel === 1 ? 'Disease' : 'Healthy'}
-              </Badge>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Age */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <label style={{ fontWeight: 600, color: 'var(--text)' }}>Age</label>
-                <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--teal)' }}>{form.Age} years</span>
-              </div>
-              <input
-                type="range"
-                min="28"
-                max="77"
-                value={form.Age}
-                onChange={(e) => setForm({ ...form, Age: Number(e.target.value) })}
-                style={{ width: '100%', accentColor: 'var(--teal)' }}
-              />
-            </div>
-
-            {/* Sex Segmented Control */}
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                Sex
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { val: 'M', label: 'Male (M)' },
-                  { val: 'F', label: 'Female (F)' },
-                ].map((s) => (
-                  <button
-                    key={s.val}
-                    type="button"
-                    onClick={() => setForm({ ...form, Sex: s.val })}
-                    style={{
-                      padding: '8px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid',
-                      borderColor: form.Sex === s.val ? 'var(--teal)' : 'var(--border)',
-                      background: form.Sex === s.val ? 'rgba(45,212,191,0.15)' : 'var(--elevated)',
-                      color: form.Sex === s.val ? 'var(--teal)' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Chest Pain Type */}
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                Chest Pain Type
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { val: 'ASY', label: 'Asymptomatic (ASY)' },
-                  { val: 'NAP', label: 'Non-Anginal (NAP)' },
-                  { val: 'ATA', label: 'Atypical Angina (ATA)' },
-                  { val: 'TA', label: 'Typical Angina (TA)' },
-                ].map((cp) => (
-                  <button
-                    key={cp.val}
-                    type="button"
-                    onClick={() => setForm({ ...form, ChestPainType: cp.val })}
-                    style={{
-                      padding: '8px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid',
-                      borderColor: form.ChestPainType === cp.val ? 'var(--teal)' : 'var(--border)',
-                      background: form.ChestPainType === cp.val ? 'rgba(45,212,191,0.15)' : 'var(--elevated)',
-                      color: form.ChestPainType === cp.val ? 'var(--teal)' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {cp.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Resting Blood Pressure */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <label style={{ fontWeight: 600, color: 'var(--text)' }}>Resting Blood Pressure</label>
-                <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--teal)' }}>{form.RestingBP} mm Hg</span>
-              </div>
-              <input
-                type="range"
-                min="80"
-                max="200"
-                value={form.RestingBP}
-                onChange={(e) => setForm({ ...form, RestingBP: Number(e.target.value) })}
-                style={{ width: '100%', accentColor: 'var(--teal)' }}
-              />
-            </div>
-
-            {/* Cholesterol with Zero-Coded Switch */}
-            <div style={{ background: 'var(--elevated)', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Serum Cholesterol</label>
-                <span style={{ fontFamily: 'JetBrains Mono', color: cholZeroToggle ? '#FB7185' : 'var(--teal)', fontWeight: 700 }}>
-                  {form.Cholesterol} mg/dl
-                </span>
-              </div>
-
-              {/* Zero-toggle switch */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <input
-                  type="checkbox"
-                  id="zeroChol"
-                  checked={cholZeroToggle}
-                  onChange={(e) => handleCholToggle(e.target.checked)}
-                  style={{ accentColor: '#FB7185', cursor: 'pointer' }}
-                />
-                <label htmlFor="zeroChol" style={{ fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
-                  Not measured (dataset codes this as 0)
-                </label>
-              </div>
-
-              {cholZeroToggle ? (
-                <div style={{ fontSize: 11, color: '#FB7185', lineHeight: 1.4, padding: '6px 10px', background: 'rgba(251,113,133,0.1)', borderRadius: 6, border: '1px solid rgba(251,113,133,0.3)' }}>
-                  ⚠ <b>Zero-missingness bias active:</b> The dataset has an 88.4% disease rate for patients with Cholesterol=0. Classifiers will treat this measurement as strong positive disease evidence.
-                </div>
-              ) : (
-                <input
-                  type="range"
-                  min="100"
-                  max="500"
-                  value={form.Cholesterol}
-                  onChange={(e) => setForm({ ...form, Cholesterol: Number(e.target.value) })}
-                  style={{ width: '100%', accentColor: 'var(--teal)' }}
-                />
-              )}
-            </div>
-
-            {/* Fasting Blood Sugar */}
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                Fasting Blood Sugar
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { val: 0, label: '≤ 120 mg/dl (Normal)' },
-                  { val: 1, label: '> 120 mg/dl (Elevated)' },
-                ].map((f) => (
-                  <button
-                    key={f.val}
-                    type="button"
-                    onClick={() => setForm({ ...form, FastingBS: f.val })}
-                    style={{
-                      padding: '8px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid',
-                      borderColor: form.FastingBS === f.val ? 'var(--teal)' : 'var(--border)',
-                      background: form.FastingBS === f.val ? 'rgba(45,212,191,0.15)' : 'var(--elevated)',
-                      color: form.FastingBS === f.val ? 'var(--teal)' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Resting ECG */}
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                Resting Electrocardiogram (ECG)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {[
-                  { val: 'Normal', label: 'Normal' },
-                  { val: 'ST', label: 'ST Abnormality' },
-                  { val: 'LVH', label: 'LVH' },
-                ].map((ecg) => (
-                  <button
-                    key={ecg.val}
-                    type="button"
-                    onClick={() => setForm({ ...form, RestingECG: ecg.val })}
-                    style={{
-                      padding: '8px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid',
-                      borderColor: form.RestingECG === ecg.val ? 'var(--teal)' : 'var(--border)',
-                      background: form.RestingECG === ecg.val ? 'rgba(45,212,191,0.15)' : 'var(--elevated)',
-                      color: form.RestingECG === ecg.val ? 'var(--teal)' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {ecg.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Max Heart Rate */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <label style={{ fontWeight: 600, color: 'var(--text)' }}>Maximum Heart Rate (MaxHR)</label>
-                <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--teal)' }}>{form.MaxHR} bpm</span>
-              </div>
-              <input
-                type="range"
-                min="60"
-                max="202"
-                value={form.MaxHR}
-                onChange={(e) => setForm({ ...form, MaxHR: Number(e.target.value) })}
-                style={{ width: '100%', accentColor: 'var(--teal)' }}
-              />
-            </div>
-
-            {/* Exercise Angina */}
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                Exercise-Induced Angina
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { val: 'N', label: 'No Angina (N)' },
-                  { val: 'Y', label: 'Yes, Angina Present (Y)' },
-                ].map((ea) => (
-                  <button
-                    key={ea.val}
-                    type="button"
-                    onClick={() => setForm({ ...form, ExerciseAngina: ea.val })}
-                    style={{
-                      padding: '8px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid',
-                      borderColor: form.ExerciseAngina === ea.val ? 'var(--teal)' : 'var(--border)',
-                      background: form.ExerciseAngina === ea.val ? 'rgba(45,212,191,0.15)' : 'var(--elevated)',
-                      color: form.ExerciseAngina === ea.val ? 'var(--teal)' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {ea.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Oldpeak (ST Depression) */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <label style={{ fontWeight: 600, color: 'var(--text)' }}>ST Depression (Oldpeak)</label>
-                <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--teal)' }}>{form.Oldpeak.toFixed(1)} mm</span>
-              </div>
-              <input
-                type="range"
-                min="-2.5"
-                max="6.0"
-                step="0.1"
-                value={form.Oldpeak}
-                onChange={(e) => setForm({ ...form, Oldpeak: Number(e.target.value) })}
-                style={{ width: '100%', accentColor: 'var(--teal)' }}
-              />
-            </div>
-
-            {/* ST Slope */}
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                ST Slope
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {[
-                  { val: 'Up', label: 'Upsloping (Up)' },
-                  { val: 'Flat', label: 'Flat' },
-                  { val: 'Down', label: 'Downsloping' },
-                ].map((sl) => (
-                  <button
-                    key={sl.val}
-                    type="button"
-                    onClick={() => setForm({ ...form, ST_Slope: sl.val })}
-                    style={{
-                      padding: '8px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid',
-                      borderColor: form.ST_Slope === sl.val ? 'var(--teal)' : 'var(--border)',
-                      background: form.ST_Slope === sl.val ? 'rgba(45,212,191,0.15)' : 'var(--elevated)',
-                      color: form.ST_Slope === sl.val ? 'var(--teal)' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {sl.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Predict Button */}
-            <button
-              onClick={() => executePrediction()}
-              disabled={loading || apiOnline === false}
-              style={{
-                marginTop: 8,
-                padding: '12px 16px',
-                fontSize: 14,
-                fontWeight: 700,
-                borderRadius: 8,
-                border: 'none',
-                background: 'var(--teal)',
-                color: '#0A0F1C',
-                cursor: loading || apiOnline === false ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                boxShadow: '0 4px 12px rgba(45,212,191,0.25)',
-                opacity: apiOnline === false ? 0.5 : 1,
-              }}
-            >
-              {loading ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
-              Compute Ensemble Risk
-            </button>
-          </div>
-        </Card>
-
-        {/* Right Column: Prediction Output & Consensus */}
-        <div>
-          {result ? (
-            <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
+        {/* Left Column: Patient Form */}
+        <div className="lg:col-span-7">
+          <Card>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>
-                  Risk Assessment Summary
-                </h3>
-                <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                  Ensemble probability synthesized across seed-42 trained pipelines
+                <h3 className="text-base font-bold text-text">Patient Clinical Features</h3>
+                <p className="text-xs text-muted">
+                  Initial values are dataset medians/modes, not a typical patient.
                 </p>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadRandomPatient}
+                disabled={loading || apiOnline === false}
+              >
+                <UserCheck size={14} className="mr-1.5 text-teal" />
+                Load Test Split Patient
+              </Button>
+            </div>
 
-              {/* Animated Risk Gauge */}
-              <div style={{ textAlign: 'center', padding: '10px 0' }}>
-                {renderGauge(result.ensemble.probability)}
-
-                <div style={{ marginTop: 8 }}>
-                  <Badge variant={result.ensemble.prediction === 1 ? 'danger' : 'success'}>
-                    Predicted: {result.ensemble.label}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Agreement Meter */}
-              <div style={{ background: 'var(--elevated)', padding: '12px 16px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Model Agreement Consensus</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', fontFamily: 'JetBrains Mono' }}>
-                    {result.ensemble.agreement}
+            {/* Held-out patient banner */}
+            {heldOutPatient && (
+              <div className="mb-5 p-3 rounded-xl bg-teal/10 border border-teal/30 text-xs flex items-center justify-between">
+                <div>
+                  <span className="text-muted">Loaded from seed-42 held-out test split. </span>
+                  <span className="font-bold text-text">
+                    Ground Truth: {heldOutPatient.trueLabel === 1 ? 'Heart Disease (1)' : 'Normal / Healthy (0)'}
                   </span>
                 </div>
-                <div style={{ width: '100%', height: 8, background: 'var(--bg)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      width: `${result.ensemble.consensus_pct}%`,
-                      height: '100%',
-                      background: result.ensemble.prediction === 1 ? '#FB7185' : '#2DD4BF',
-                      transition: 'width 0.4s ease',
-                    }}
+                <Badge variant={heldOutPatient.trueLabel === 1 ? 'danger' : 'success'}>
+                  True Label: {heldOutPatient.trueLabel}
+                </Badge>
+              </div>
+            )}
+
+            {/* Form Inputs Grid */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                executePrediction()
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Age */}
+                <div>
+                  <label htmlFor="input-age" className="block text-xs font-semibold text-text mb-1">
+                    Age (years): <span className="font-mono text-teal">{form.Age}</span>
+                  </label>
+                  <input
+                    id="input-age"
+                    type="range"
+                    min="28"
+                    max="77"
+                    value={form.Age}
+                    onChange={(e) => setForm({ ...form, Age: Number(e.target.value) })}
+                    className="w-full accent-teal"
                   />
+                  <div className="flex justify-between text-[10px] text-muted font-mono">
+                    <span>28</span>
+                    <span>77</span>
+                  </div>
+                </div>
+
+                {/* Sex */}
+                <div>
+                  <label htmlFor="select-sex" className="block text-xs font-semibold text-text mb-1">
+                    Sex
+                  </label>
+                  <select
+                    id="select-sex"
+                    value={form.Sex}
+                    onChange={(e) => setForm({ ...form, Sex: e.target.value })}
+                    className="w-full bg-elevated border border-border text-text rounded-lg p-2 text-xs focus-visible:ring-2 focus-visible:ring-teal"
+                  >
+                    <option value="M">Male (M)</option>
+                    <option value="F">Female (F)</option>
+                  </select>
+                </div>
+
+                {/* Chest Pain Type */}
+                <div>
+                  <label htmlFor="select-cpt" className="block text-xs font-semibold text-text mb-1">
+                    Chest Pain Type
+                  </label>
+                  <select
+                    id="select-cpt"
+                    value={form.ChestPainType}
+                    onChange={(e) => setForm({ ...form, ChestPainType: e.target.value })}
+                    className="w-full bg-elevated border border-border text-text rounded-lg p-2 text-xs focus-visible:ring-2 focus-visible:ring-teal"
+                  >
+                    <option value="ASY">Asymptomatic (ASY)</option>
+                    <option value="NAP">Non-Anginal Pain (NAP)</option>
+                    <option value="ATA">Atypical Angina (ATA)</option>
+                    <option value="TA">Typical Angina (TA)</option>
+                  </select>
+                </div>
+
+                {/* Resting BP */}
+                <div>
+                  <label htmlFor="input-bp" className="block text-xs font-semibold text-text mb-1">
+                    Resting BP (mm Hg): <span className="font-mono text-teal">{form.RestingBP}</span>
+                  </label>
+                  <input
+                    id="input-bp"
+                    type="range"
+                    min="80"
+                    max="200"
+                    value={form.RestingBP}
+                    onChange={(e) => setForm({ ...form, RestingBP: Number(e.target.value) })}
+                    className="w-full accent-teal"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted font-mono">
+                    <span>80</span>
+                    <span>200</span>
+                  </div>
+                </div>
+
+                {/* Cholesterol with Zero-Toggle Shortcut */}
+                <div className="sm:col-span-2 p-3 bg-elevated/70 rounded-xl border border-border">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                    <label htmlFor="input-chol" className="text-xs font-semibold text-text">
+                      Serum Cholesterol (mg/dl): <span className="font-mono text-teal">{form.Cholesterol}</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-amber cursor-pointer font-medium">
+                      <input
+                        type="checkbox"
+                        checked={cholZeroToggle}
+                        onChange={(e) => handleCholToggle(e.target.checked)}
+                        className="rounded accent-amber"
+                      />
+                      Force Cholesterol = 0 (Artifact Simulation)
+                    </label>
+                  </div>
+                  <input
+                    id="input-chol"
+                    type="range"
+                    min="0"
+                    max="603"
+                    disabled={cholZeroToggle}
+                    value={form.Cholesterol}
+                    onChange={(e) => setForm({ ...form, Cholesterol: Number(e.target.value) })}
+                    className="w-full accent-teal disabled:opacity-40"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted font-mono mt-0.5">
+                    <span>0</span>
+                    <span>603</span>
+                  </div>
+                </div>
+
+                {/* Fasting Blood Sugar */}
+                <div>
+                  <label htmlFor="select-fbs" className="block text-xs font-semibold text-text mb-1">
+                    Fasting Blood Sugar
+                  </label>
+                  <select
+                    id="select-fbs"
+                    value={form.FastingBS}
+                    onChange={(e) => setForm({ ...form, FastingBS: Number(e.target.value) })}
+                    className="w-full bg-elevated border border-border text-text rounded-lg p-2 text-xs focus-visible:ring-2 focus-visible:ring-teal"
+                  >
+                    <option value={0}>Normal (≤ 120 mg/dl)</option>
+                    <option value={1}>Elevated (&gt; 120 mg/dl)</option>
+                  </select>
+                </div>
+
+                {/* Resting ECG */}
+                <div>
+                  <label htmlFor="select-ecg" className="block text-xs font-semibold text-text mb-1">
+                    Resting ECG
+                  </label>
+                  <select
+                    id="select-ecg"
+                    value={form.RestingECG}
+                    onChange={(e) => setForm({ ...form, RestingECG: e.target.value })}
+                    className="w-full bg-elevated border border-border text-text rounded-lg p-2 text-xs focus-visible:ring-2 focus-visible:ring-teal"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="ST">ST-T Wave Abnormality (ST)</option>
+                    <option value="LVH">Left Ventricular Hypertrophy (LVH)</option>
+                  </select>
+                </div>
+
+                {/* Max Heart Rate */}
+                <div>
+                  <label htmlFor="input-maxhr" className="block text-xs font-semibold text-text mb-1">
+                    Max Heart Rate: <span className="font-mono text-teal">{form.MaxHR}</span>
+                  </label>
+                  <input
+                    id="input-maxhr"
+                    type="range"
+                    min="60"
+                    max="202"
+                    value={form.MaxHR}
+                    onChange={(e) => setForm({ ...form, MaxHR: Number(e.target.value) })}
+                    className="w-full accent-teal"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted font-mono">
+                    <span>60</span>
+                    <span>202</span>
+                  </div>
+                </div>
+
+                {/* Exercise Induced Angina */}
+                <div>
+                  <label htmlFor="select-exang" className="block text-xs font-semibold text-text mb-1">
+                    Exercise-Induced Angina
+                  </label>
+                  <select
+                    id="select-exang"
+                    value={form.ExerciseAngina}
+                    onChange={(e) => setForm({ ...form, ExerciseAngina: e.target.value })}
+                    className="w-full bg-elevated border border-border text-text rounded-lg p-2 text-xs focus-visible:ring-2 focus-visible:ring-teal"
+                  >
+                    <option value="N">No (N)</option>
+                    <option value="Y">Yes (Y)</option>
+                  </select>
+                </div>
+
+                {/* Oldpeak (ST Depression) */}
+                <div>
+                  <label htmlFor="input-oldpeak" className="block text-xs font-semibold text-text mb-1">
+                    ST Depression (Oldpeak): <span className="font-mono text-teal">{form.Oldpeak}</span>
+                  </label>
+                  <input
+                    id="input-oldpeak"
+                    type="range"
+                    min="-2.6"
+                    max="6.2"
+                    step="0.1"
+                    value={form.Oldpeak}
+                    onChange={(e) => setForm({ ...form, Oldpeak: Number(e.target.value) })}
+                    className="w-full accent-teal"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted font-mono">
+                    <span>-2.6</span>
+                    <span>6.2</span>
+                  </div>
+                </div>
+
+                {/* ST Slope */}
+                <div>
+                  <label htmlFor="select-slope" className="block text-xs font-semibold text-text mb-1">
+                    Peak Exercise ST Slope
+                  </label>
+                  <select
+                    id="select-slope"
+                    value={form.ST_Slope}
+                    onChange={(e) => setForm({ ...form, ST_Slope: e.target.value })}
+                    className="w-full bg-elevated border border-border text-text rounded-lg p-2 text-xs focus-visible:ring-2 focus-visible:ring-teal"
+                  >
+                    <option value="Up">Upsloping (Up)</option>
+                    <option value="Flat">Flat</option>
+                    <option value="Down">Downsloping (Down)</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Ground Truth Comparison if test patient was loaded */}
-              {heldOutPatient && (
-                <div
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: 8,
-                    background: heldOutPatient.trueLabel === result.ensemble.prediction
-                      ? 'rgba(52,211,153,0.08)'
-                      : 'rgba(251,113,133,0.08)',
-                    border: `1px solid ${
-                      heldOutPatient.trueLabel === result.ensemble.prediction
-                        ? 'rgba(52,211,153,0.3)'
-                        : 'rgba(251,113,133,0.3)'
-                    }`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  className="w-full"
+                  disabled={loading || apiOnline === false}
                 >
-                  {heldOutPatient.trueLabel === result.ensemble.prediction ? (
-                    <CheckCircle2 size={20} color="#34D399" style={{ flexShrink: 0 }} />
-                  ) : (
-                    <XCircle size={20} color="#FB7185" style={{ flexShrink: 0 }} />
-                  )}
-                  <div style={{ fontSize: 12, lineHeight: 1.4 }}>
-                    <b>Ground Truth Verification:</b> The ensemble predicted{' '}
-                    <b>{result.ensemble.prediction === 1 ? 'Disease' : 'Healthy'}</b>. The true label for this held-out test patient is{' '}
-                    <b>{heldOutPatient.trueLabel === 1 ? 'Heart Disease' : 'Healthy'}</b> (
-                    {heldOutPatient.trueLabel === result.ensemble.prediction ? 'Accurate Match ✓' : 'Discrepancy ✗'}).
-                  </div>
-                </div>
-              )}
+                  <Play size={16} className="fill-current" />
+                  {loading ? 'Evaluating Models...' : 'Calculate Risk & Consensus'}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
 
-              {/* Per-Model Probability Breakdown Bars */}
-              <div>
-                <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-                  Per-Model Breakdown
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {Object.entries(result.models).map(([mName, mData]) => {
-                    if (!mData.available || mData.probability === null) {
+        {/* Right Column: Prediction Results */}
+        <div className="lg:col-span-5 space-y-5">
+          {result ? (
+            <>
+              {/* Ensemble Gauge Card */}
+              <Card>
+                <div className="text-center mb-3">
+                  <Badge variant={result.ensemble.prediction === 1 ? 'danger' : 'success'}>
+                    {result.ensemble.label}
+                  </Badge>
+                  <h3 className="text-lg font-bold text-text mt-2">
+                    Ensemble Heart Disease Probability
+                  </h3>
+                  <p className="text-xs text-muted">
+                    {result.ensemble.agreement} ({result.ensemble.consensus_pct}% consensus)
+                  </p>
+                </div>
+
+                {renderGauge(result.ensemble.probability)}
+
+                <div className="text-center text-xs text-muted mt-2">
+                  Decision threshold: 50.0% probability
+                </div>
+              </Card>
+
+              {/* Individual Model Breakdown */}
+              <Card>
+                <h4 className="text-sm font-bold text-text mb-3">Individual Model Breakdown</h4>
+                <div className="space-y-2.5">
+                  {['NB', 'DT', 'RF', 'SVM', 'LR', 'DNN'].map((m) => {
+                    const modelRes = result.models[m]
+                    if (!modelRes || !modelRes.available) {
                       return (
-                        <div key={mName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, padding: '6px 10px', background: 'var(--elevated)', borderRadius: 6 }}>
-                          <span style={{ fontWeight: 600, color: 'var(--muted)' }}>{mName}</span>
-                          <span style={{ fontStyle: 'italic', color: 'var(--muted)', fontSize: 11 }}>Model unavailable</span>
+                        <div key={m} className="flex items-center justify-between p-2 rounded-lg bg-elevated/40 text-xs">
+                          <span className="font-semibold text-muted">{m} ({MODEL_LABELS[m]})</span>
+                          <span className="text-[11px] text-muted italic">Unavailable (Not loaded)</span>
                         </div>
                       )
                     }
 
-                    const probPct = (mData.probability * 100).toFixed(1)
-                    const isDis = mData.prediction === 1
+                    const prob = modelRes.probability ?? 0
+                    const isDisease = modelRes.prediction === 1
 
                     return (
-                      <div key={mName} style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 10px', background: 'var(--elevated)', borderRadius: 6 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                          <span style={{ fontWeight: 700, color: 'var(--text)' }}>{mName} ({MODEL_LABELS[mName] || mName})</span>
-                          <span style={{ fontFamily: 'JetBrains Mono', fontWeight: 600, color: isDis ? '#FB7185' : '#2DD4BF' }}>
-                            {probPct}% ({mData.label})
+                      <div key={m} className="p-2.5 rounded-xl bg-elevated/60 border border-border">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-bold text-text">{m} ({MODEL_LABELS[m]})</span>
+                          <span className={`font-mono font-bold ${isDisease ? 'text-rose-400' : 'text-teal'}`}>
+                            {(prob * 100).toFixed(1)}% ({modelRes.label})
                           </span>
                         </div>
-                        <div style={{ width: '100%', height: 4, background: 'var(--bg)', borderRadius: 2, overflow: 'hidden' }}>
+                        {/* Progress Bar */}
+                        <div className="h-1.5 w-full bg-surface rounded-full overflow-hidden">
                           <div
-                            style={{
-                              width: `${probPct}%`,
-                              height: '100%',
-                              background: isDis ? '#FB7185' : '#2DD4BF',
-                              transition: 'width 0.4s ease',
-                            }}
+                            className={`h-full transition-all duration-300 ${isDisease ? 'bg-rose-500' : 'bg-teal'}`}
+                            style={{ width: `${prob * 100}%` }}
                           />
                         </div>
                       </div>
                     )
                   })}
                 </div>
+              </Card>
+
+              {/* Medical Disclaimer */}
+              <div className="p-3 bg-elevated/50 border border-border rounded-xl text-[11px] text-muted leading-relaxed flex items-start gap-2">
+                <ShieldAlert size={16} className="text-amber flex-shrink-0 mt-0.5" />
+                <span>{result.disclaimer}</span>
               </div>
-            </Card>
+            </>
           ) : (
-            <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
-              <Activity size={48} color="var(--border)" style={{ marginBottom: 16 }} />
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
-                Awaiting Patient Parameters
-              </h3>
-              <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 320, lineHeight: 1.5, margin: 0 }}>
-                Adjust the clinical features on the left, or click "Load Random Test Patient" to evaluate held-out benchmark cases against our trained ensemble.
+            <Card className="h-full min-h-[320px] flex flex-col items-center justify-center text-center p-8">
+              <Activity size={40} className="text-teal/40 mb-3" />
+              <h4 className="text-base font-bold text-text mb-1">No Prediction Generated Yet</h4>
+              <p className="text-xs text-muted max-w-xs leading-relaxed">
+                Adjust clinical parameters on the left or click "Load Test Split Patient" to evaluate the models against held-out ground truth.
               </p>
             </Card>
           )}
