@@ -9,3 +9,8 @@ venv/
 Thumbs.db
 *.tsbuildinfo
 screenshots/
+
+# Generated EDA / figure outputs
+eda_corr.png
+eda_dist.png
+figs/
