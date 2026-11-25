@@ -22,9 +22,9 @@ import joblib
 import sklearn
 
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE.parent
 MODELS_DIR = _HERE / "models"
-DATA_PATH = PROJECT_ROOT / "heart.csv"
+SCHEMA_STATS_PATH = MODELS_DIR / "schema_stats.json"
+FRONTEND_DIST_DIR = _HERE.parent / "frontend" / "dist"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
@@ -139,18 +139,20 @@ def load_all_models():
 
 load_all_models()
 
-# Dynamically compute zero-cholesterol count and disease rate from heart.csv
-chol_zero_count = 172
-chol_zero_disease_rate = 88.4
-if DATA_PATH.exists():
+# Load precomputed schema statistics (never read heart.csv at runtime)
+schema_stats: Dict[str, Any] = {}
+if SCHEMA_STATS_PATH.exists():
     try:
-        _df = pd.read_csv(DATA_PATH)
-        _chol_zeros = _df[_df["Cholesterol"] == 0]
-        chol_zero_count = int(len(_chol_zeros))
-        if chol_zero_count > 0:
-            chol_zero_disease_rate = round(float(_chol_zeros["HeartDisease"].mean() * 100), 1)
+        with open(SCHEMA_STATS_PATH, "r") as f:
+            schema_stats = json.load(f)
     except Exception as e:
-        logger.warning(f"Could not compute cholesterol statistics from heart.csv: {e}")
+        logger.warning(f"Could not read schema_stats.json: {e}")
+else:
+    logger.warning("schema_stats.json not found in models/. Run 'python api/train_models.py --skip-dnn' to generate it.")
+
+chol_zero_count = schema_stats.get("chol_zero_count", 172)
+chol_zero_disease_rate = schema_stats.get("chol_zero_disease_rate_pct", 88.4)
+feature_stats = schema_stats.get("features", {})
 
 chol_zero_note = (
     f"Dataset codes missing values as 0. {chol_zero_count} patients have Cholesterol=0, "
@@ -183,15 +185,21 @@ def get_health():
 
 @app.get("/api/schema")
 def get_schema():
+    age_stats = feature_stats.get("Age", {})
+    bp_stats = feature_stats.get("RestingBP", {})
+    chol_stats = feature_stats.get("Cholesterol", {})
+    hr_stats = feature_stats.get("MaxHR", {})
+    oldpeak_stats = feature_stats.get("Oldpeak", {})
+
     return {
         "features": [
             {
                 "name": "Age",
                 "label": "Age",
                 "type": "numeric",
-                "min": 28,
-                "max": 77,
-                "default": 54,
+                "min": age_stats.get("min", 28),
+                "max": age_stats.get("max", 77),
+                "default": age_stats.get("median", 54),
                 "step": 1,
                 "unit": "years",
                 "description": "Patient age in years"
@@ -224,9 +232,9 @@ def get_schema():
                 "name": "RestingBP",
                 "label": "Resting Blood Pressure",
                 "type": "numeric",
-                "min": 80,
-                "max": 200,
-                "default": 130,
+                "min": bp_stats.get("positive_min", 80),
+                "max": bp_stats.get("max", 200),
+                "default": bp_stats.get("median", 130),
                 "step": 1,
                 "unit": "mm Hg",
                 "description": "Resting blood pressure in mm Hg upon hospital admission"
@@ -235,9 +243,9 @@ def get_schema():
                 "name": "Cholesterol",
                 "label": "Serum Cholesterol",
                 "type": "numeric",
-                "min": 0,
-                "max": 603,
-                "default": 223,
+                "min": chol_stats.get("min", 0),
+                "max": chol_stats.get("max", 603),
+                "default": chol_stats.get("median", 223),
                 "step": 1,
                 "unit": "mg/dl",
                 "zero_note": chol_zero_note,
@@ -270,9 +278,9 @@ def get_schema():
                 "name": "MaxHR",
                 "label": "Maximum Heart Rate",
                 "type": "numeric",
-                "min": 60,
-                "max": 202,
-                "default": 138,
+                "min": hr_stats.get("min", 60),
+                "max": hr_stats.get("max", 202),
+                "default": hr_stats.get("median", 138),
                 "step": 1,
                 "unit": "bpm",
                 "description": "Maximum heart rate achieved during exercise stress test"
@@ -292,8 +300,8 @@ def get_schema():
                 "name": "Oldpeak",
                 "label": "ST Depression (Oldpeak)",
                 "type": "numeric",
-                "min": -2.6,
-                "max": 6.2,
+                "min": oldpeak_stats.get("min", -2.6),
+                "max": oldpeak_stats.get("max", 6.2),
                 "default": 0.0,
                 "step": 0.1,
                 "unit": "mm",
@@ -410,10 +418,9 @@ def predict_heart_disease(patient: PatientInput):
     }
 
 # Mount frontend static files after all API routes if SERVE_FRONTEND=1
-if os.environ.get("SERVE_FRONTEND") == "1" and (PROJECT_ROOT / "frontend" / "dist").exists():
-    dist_path = PROJECT_ROOT / "frontend" / "dist"
-    logger.info(f"Mounting static frontend files from {dist_path}")
-    app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="frontend")
+if os.environ.get("SERVE_FRONTEND") == "1" and FRONTEND_DIST_DIR.exists():
+    logger.info(f"Mounting static frontend files from {FRONTEND_DIST_DIR}")
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST_DIR), html=True), name="frontend")
 else:
     @app.get("/")
     def get_root_info():

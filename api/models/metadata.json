@@ -1,0 +1,30 @@
+{
+  "seed": 42,
+  "models": {
+    "NB": {
+      "type": "sklearn",
+      "accuracy": 0.8858695652173914
+    },
+    "DT": {
+      "type": "sklearn",
+      "accuracy": 0.8206521739130435
+    },
+    "RF": {
+      "type": "sklearn",
+      "accuracy": 0.9021739130434783
+    },
+    "SVM": {
+      "type": "sklearn",
+      "accuracy": 0.8967391304347826
+    },
+    "LR": {
+      "type": "sklearn",
+      "accuracy": 0.8913043478260869
+    },
+    "DNN": {
+      "type": "unavailable",
+      "accuracy": null,
+      "available": false
+    }
+  }
+}

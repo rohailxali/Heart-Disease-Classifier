@@ -162,6 +162,55 @@ def main():
     with open(MODELS_DIR / "test_samples.json", "w") as f:
         json.dump(test_samples, f, indent=2)
     print(f"Saved {len(test_samples)} held-out test samples to {MODELS_DIR / 'test_samples.json'}")
+
+    # Save precomputed dataset statistics for /api/schema so api/main.py never reads heart.csv at runtime
+    chol_zeros = df[df["Cholesterol"] == 0]
+    chol_nonzeros = df[df["Cholesterol"] > 0]
+    chol_zero_count = int(len(chol_zeros))
+    chol_zero_disease_count = int(chol_zeros["HeartDisease"].sum()) if chol_zero_count > 0 else 0
+    chol_zero_disease_rate_pct = round(float(chol_zeros["HeartDisease"].mean() * 100), 1) if chol_zero_count > 0 else 0.0
+    chol_nonzero_count = int(len(chol_nonzeros))
+    chol_nonzero_disease_rate_pct = round(float(chol_nonzeros["HeartDisease"].mean() * 100), 1) if chol_nonzero_count > 0 else 0.0
+
+    schema_stats = {
+        "total_rows": int(len(df)),
+        "chol_zero_count": chol_zero_count,
+        "chol_zero_disease_count": chol_zero_disease_count,
+        "chol_zero_disease_rate_pct": chol_zero_disease_rate_pct,
+        "chol_nonzero_count": chol_nonzero_count,
+        "chol_nonzero_disease_rate_pct": chol_nonzero_disease_rate_pct,
+        "features": {
+            "Age": {
+                "min": int(df["Age"].min()),
+                "max": int(df["Age"].max()),
+                "median": int(df["Age"].median()),
+            },
+            "RestingBP": {
+                "min": int(df["RestingBP"].min()),
+                "positive_min": int(df.loc[df["RestingBP"] > 0, "RestingBP"].min()),
+                "max": int(df["RestingBP"].max()),
+                "median": int(df["RestingBP"].median()),
+            },
+            "Cholesterol": {
+                "min": int(df["Cholesterol"].min()),
+                "max": int(df["Cholesterol"].max()),
+                "median": int(df["Cholesterol"].median()),
+            },
+            "MaxHR": {
+                "min": int(df["MaxHR"].min()),
+                "max": int(df["MaxHR"].max()),
+                "median": int(df["MaxHR"].median()),
+            },
+            "Oldpeak": {
+                "min": float(df["Oldpeak"].min()),
+                "max": float(df["Oldpeak"].max()),
+                "median": float(df["Oldpeak"].median()),
+            },
+        },
+    }
+    with open(MODELS_DIR / "schema_stats.json", "w") as f:
+        json.dump(schema_stats, f, indent=2)
+    print(f"Saved precomputed schema statistics to {MODELS_DIR / 'schema_stats.json'}")
     print("All models trained and verified successfully!")
 
 if __name__ == "__main__":

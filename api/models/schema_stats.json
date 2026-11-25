@@ -1,0 +1,36 @@
+{
+  "total_rows": 918,
+  "chol_zero_count": 172,
+  "chol_zero_disease_count": 152,
+  "chol_zero_disease_rate_pct": 88.4,
+  "chol_nonzero_count": 746,
+  "chol_nonzero_disease_rate_pct": 47.7,
+  "features": {
+    "Age": {
+      "min": 28,
+      "max": 77,
+      "median": 54
+    },
+    "RestingBP": {
+      "min": 0,
+      "positive_min": 80,
+      "max": 200,
+      "median": 130
+    },
+    "Cholesterol": {
+      "min": 0,
+      "max": 603,
+      "median": 223
+    },
+    "MaxHR": {
+      "min": 60,
+      "max": 202,
+      "median": 138
+    },
+    "Oldpeak": {
+      "min": -2.6,
+      "max": 6.2,
+      "median": 0.6
+    }
+  }
+}
