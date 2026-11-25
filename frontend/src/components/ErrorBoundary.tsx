@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from './Button'
-import { Card } from './Card'
 
 interface Props {
   children: ReactNode
@@ -35,24 +34,24 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="min-h-[50vh] flex items-center justify-center p-6">
-          <Card className="max-w-md w-full p-6 text-center space-y-4 border-rose-500/30">
-            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 mx-auto flex items-center justify-center">
-              <AlertTriangle size={24} />
+          <div className="max-w-md w-full p-6 border-t border-b border-oxblood bg-surface text-center space-y-4">
+            <div className="w-10 h-10 border border-oxblood/40 text-oxblood mx-auto flex items-center justify-center">
+              <AlertTriangle size={20} />
             </div>
-            <h2 className="text-lg font-bold text-text">Something went wrong</h2>
+            <h2 className="font-display text-xl font-bold text-ink">View interrupted</h2>
             <p className="text-sm text-muted">
-              {this.state.error?.message || 'An unexpected rendering error occurred in this view.'}
+              {this.state.error?.message || 'An unexpected rendering error occurred in this section.'}
             </p>
             <div className="pt-2 flex justify-center gap-3">
               <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
-                <RefreshCw size={14} className="mr-1.5" />
-                Reload Page
+                <RefreshCw size={14} />
+                Reload
               </Button>
               <Button variant="primary" size="sm" onClick={this.handleReset}>
-                Return to Overview
+                Return to Notebook
               </Button>
             </div>
-          </Card>
+          </div>
         </div>
       )
     }

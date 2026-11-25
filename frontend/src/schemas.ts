@@ -56,6 +56,14 @@ export const EdaSchema = z.object({
     zero_restingbp_rows: z.number(),
     disease_rate_zero_cholesterol_pct: z.number(),
     disease_rate_nonzero_cholesterol_pct: z.number(),
+    cholesterol_zero_x_disease: z.object({
+      zero_chol_disease: z.number(),
+      zero_chol_healthy: z.number(),
+      nonzero_chol_disease: z.number(),
+      nonzero_chol_healthy: z.number(),
+      total_zero_chol: z.number(),
+      total_nonzero_chol: z.number(),
+    }).optional(),
     cholesterol_all_hist: HistogramSchema,
     cholesterol_nonzero_hist: HistogramSchema,
   }),
@@ -144,3 +152,42 @@ export const AssumptionSchema = z.object({
 })
 export const AssumptionsSchema = z.array(AssumptionSchema)
 export type Assumption = z.infer<typeof AssumptionSchema>
+
+// variants.json
+export const VariantStatSchema = z.object({ mean: z.number(), std: z.number() })
+export const DeltaBSchema = z.object({
+  baseline_accuracy: z.number(),
+  variant_b_accuracy: z.number(),
+  delta_accuracy_pp: z.number(),
+  baseline_auc: z.number(),
+  variant_b_auc: z.number(),
+  delta_auc_pp: z.number(),
+})
+export const DeltaASchema = z.object({
+  baseline_accuracy: z.number(),
+  variant_a_accuracy: z.number(),
+  delta_accuracy_pp: z.number(),
+  baseline_auc: z.number(),
+  variant_a_auc: z.number(),
+  delta_auc_pp: z.number(),
+})
+
+export const VariantsSchema = z.object({
+  variant_a_dnn_early_stopping: z.object({
+    title: z.string(),
+    description: z.string(),
+    hypothesis: z.string(),
+    status: z.enum(['not_run', 'executed']),
+    models: z.record(z.string(), z.record(z.string(), VariantStatSchema)).optional(),
+    deltas_vs_baseline: z.record(z.string(), DeltaASchema).optional(),
+  }),
+  variant_b_median_imputation: z.object({
+    title: z.string(),
+    description: z.string(),
+    hypothesis: z.string(),
+    status: z.enum(['not_run', 'executed']),
+    models: z.record(z.string(), z.record(z.string(), VariantStatSchema)).optional(),
+    deltas_vs_baseline: z.record(z.string(), DeltaBSchema).optional(),
+  }),
+})
+export type Variants = z.infer<typeof VariantsSchema>

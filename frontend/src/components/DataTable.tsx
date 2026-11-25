@@ -12,6 +12,7 @@ export interface Column<T> {
 }
 
 export interface DataTableProps<T> {
+  caption: string
   columns: Column<T>[]
   data: T[]
   keyField?: keyof T | ((row: T) => string | number)
@@ -22,6 +23,7 @@ export interface DataTableProps<T> {
 }
 
 export function DataTable<T>({
+  caption,
   columns,
   data,
   keyField = 'id' as unknown as keyof T,
@@ -48,7 +50,7 @@ export function DataTable<T>({
     if (!col || !col.sortable) return data
 
     return [...data].sort((a, b) => {
-      const getVal = col.sortValue ?? ((row: T) => (row as Record<string, unknown>)[sortKey])
+      const getVal = col.sortValue ?? ((row: T) => (row as Record<string, unknown>)[sortKey] as string | number)
       const valA = getVal(a)
       const valB = getVal(b)
 
@@ -61,10 +63,15 @@ export function DataTable<T>({
   }, [data, columns, sortKey, sortDir])
 
   return (
-    <div className={`w-full overflow-x-auto rounded-xl border border-border bg-surface ${className}`}>
-      <table className="w-full text-left text-sm border-collapse">
+    <div className={`w-full border-t border-b border-rule bg-surface ${className}`}>
+      <div className="px-4 py-2.5 text-xs marginalia border-b border-rule/70">
+        {caption}
+      </div>
+      <div className="w-full overflow-x-auto">
+        <table className="w-full text-left text-sm border-collapse">
+          <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr className="border-b border-border bg-elevated/50 text-xs font-semibold text-muted uppercase tracking-wider">
+          <tr className="border-b border-rule text-[11px] font-mono font-medium text-muted uppercase tracking-wider">
             {columns.map(col => {
               const isSorted = sortKey === col.key
               const alignClass = {
@@ -75,7 +82,7 @@ export function DataTable<T>({
 
               if (!col.sortable) {
                 return (
-                  <th key={col.key} className={`py-3 px-4 ${alignClass} ${col.className || ''}`}>
+                  <th key={col.key} scope="col" className={`py-2.5 px-3.5 ${alignClass} ${col.className || ''}`}>
                     {col.header}
                   </th>
                 )
@@ -84,26 +91,21 @@ export function DataTable<T>({
               return (
                 <th
                   key={col.key}
+                  scope="col"
                   aria-sort={isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  className={`py-3 px-4 ${alignClass} ${col.className || ''}`}
+                  className={`py-2.5 px-3.5 ${alignClass} ${col.className || ''}`}
                 >
                   <button
                     type="button"
                     onClick={() => handleSort(col.key)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        handleSort(col.key)
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 font-semibold text-muted hover:text-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal rounded"
+                    className="inline-flex items-center gap-1 font-mono font-medium text-muted hover:text-ink uppercase tracking-wider focus-visible:outline-none rounded-[1px]"
                   >
                     <span>{col.header}</span>
-                    <span className="text-muted/60">
+                    <span className="text-muted/70" aria-hidden="true">
                       {isSorted ? (
-                        sortDir === 'asc' ? <ChevronUp size={14} className="text-teal" /> : <ChevronDown size={14} className="text-teal" />
+                        sortDir === 'asc' ? <ChevronUp size={13} className="text-ink" /> : <ChevronDown size={13} className="text-ink" />
                       ) : (
-                        <ChevronsUpDown size={14} />
+                        <ChevronsUpDown size={13} />
                       )}
                     </span>
                   </button>
@@ -112,18 +114,20 @@ export function DataTable<T>({
             })}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/60">
+        <tbody className="divide-y divide-rule/50">
           {sortedData.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="py-8 text-center text-muted">
+              <td colSpan={columns.length} className="py-8 text-center text-muted text-xs font-mono">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             sortedData.map((row, idx) => {
-              const rowKey = typeof keyField === 'function' ? keyField(row) : String((row as Record<string, unknown>)[keyField as string] ?? idx)
+              const rowKey = typeof keyField === 'function'
+                ? keyField(row)
+                : String((row as Record<string, unknown>)[keyField as string] ?? idx)
               return (
-                <tr key={rowKey} className="hover:bg-elevated/40 transition-colors">
+                <tr key={rowKey} className="hover:bg-ink/[0.03] transition-colors">
                   {columns.map(col => {
                     const alignClass = {
                       left: 'text-left',
@@ -131,7 +135,7 @@ export function DataTable<T>({
                       right: 'text-right',
                     }[col.align || 'left']
                     return (
-                      <td key={col.key} className={`py-3 px-4 ${alignClass} ${col.className || ''}`}>
+                      <td key={col.key} className={`py-2.5 px-3.5 ${alignClass} ${col.className || ''}`}>
                         {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}
                       </td>
                     )
@@ -142,6 +146,7 @@ export function DataTable<T>({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

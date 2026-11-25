@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 export interface SegmentedOption<T extends string | number> {
   value: T
@@ -26,6 +26,7 @@ export function SegmentedControl<T extends string | number>({
   ariaLabel = 'Segmented options',
 }: SegmentedControlProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const reduceMotion = useReducedMotion()
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     let nextIndex = -1
@@ -47,15 +48,14 @@ export function SegmentedControl<T extends string | number>({
     }
   }
 
-  const paddingClass = size === 'sm' ? 'p-0.5 text-xs' : 'p-1 text-sm'
-  const itemPadding = size === 'sm' ? 'px-2.5 py-1' : 'px-3.5 py-1.5'
+  const sizePad = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm'
 
   return (
     <div
       ref={containerRef}
       role="radiogroup"
       aria-label={ariaLabel}
-      className={`inline-flex items-center bg-elevated border border-border rounded-xl ${paddingClass} ${className}`}
+      className={`inline-flex flex-wrap items-center border border-rule bg-surface rounded-[2px] p-0.5 ${className}`}
     >
       {options.map((opt, i) => {
         const isSelected = opt.value === value
@@ -69,15 +69,15 @@ export function SegmentedControl<T extends string | number>({
             tabIndex={isSelected ? 0 : -1}
             onClick={() => onChange(opt.value)}
             onKeyDown={(e) => handleKeyDown(e, i)}
-            className={`relative flex items-center justify-center font-medium rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-teal ${itemPadding} ${
-              isSelected ? 'text-text font-semibold' : 'text-muted hover:text-text'
+            className={`relative flex items-center justify-center font-mono rounded-[1px] transition-colors duration-150 focus-visible:outline-none ${sizePad} ${
+              isSelected ? 'text-bg font-medium' : 'text-muted hover:text-ink'
             }`}
           >
             {isSelected && (
-              <motion.div
-                layoutId={`segmented-active-${name || 'default'}`}
-                className="absolute inset-0 bg-surface rounded-lg shadow-sm border border-border"
-                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              <motion.span
+                layoutId={reduceMotion ? undefined : `stamp-${name || 'ctrl'}`}
+                className="absolute inset-0 bg-ink rounded-[1px]"
+                transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 480, damping: 38 }}
               />
             )}
             <span className="relative z-10">{opt.label}</span>

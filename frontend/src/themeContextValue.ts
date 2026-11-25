@@ -1,8 +1,8 @@
 import { createContext } from 'react'
 
-export type Theme = 'dark' | 'light'
+export type Theme = 'light' | 'dark'
 
 export const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({
-  theme: 'dark',
+  theme: 'light',
   toggle: () => {},
 })

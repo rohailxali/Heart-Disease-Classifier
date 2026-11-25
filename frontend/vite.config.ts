@@ -7,14 +7,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes('node_modules/recharts')) {
-            return 'recharts-vendor'
+          if (id.includes('node_modules/d3-')) {
+            return 'd3-vendor'
           }
           if (id.includes('node_modules/framer-motion')) {
             return 'motion-vendor'
           }
           if (id.includes('node_modules/lucide-react')) {
             return 'icons-vendor'
+          }
+          if (id.includes('node_modules/zod')) {
+            return 'zod-vendor'
           }
         },
       },

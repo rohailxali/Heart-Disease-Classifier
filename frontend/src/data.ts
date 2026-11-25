@@ -2,9 +2,9 @@
 import { z } from 'zod'
 import {
   MetaSchema, EdaSchema, ResultsSchema, ComparisonSchema,
-  ParamsSchema, CurvesSchema, AssumptionsSchema,
+  ParamsSchema, CurvesSchema, AssumptionsSchema, VariantsSchema,
   type Meta, type Eda, type Results, type CompRow,
-  type Params, type Curves, type Assumption,
+  type Params, type Curves, type Assumption, type Variants,
 } from './schemas'
 
 const BASE = import.meta.env.BASE_URL + 'data/'
@@ -22,6 +22,14 @@ async function loadJson<T>(file: string, schema: z.ZodType<T>): Promise<T> {
   return result.data
 }
 
+async function loadOptionalVariants(): Promise<Variants | null> {
+  try {
+    return await loadJson('variants.json', VariantsSchema)
+  } catch {
+    return null
+  }
+}
+
 export interface AllData {
   meta: Meta
   eda: Eda
@@ -30,13 +38,14 @@ export interface AllData {
   params: Params
   curves: Curves
   assumptions: Assumption[]
+  variants: Variants | null
 }
 
 let _cache: AllData | null = null
 
 export async function loadAllData(): Promise<AllData> {
   if (_cache) return _cache
-  const [meta, eda, results, comparison, params, curves, assumptions] = await Promise.all([
+  const [meta, eda, results, comparison, params, curves, assumptions, variants] = await Promise.all([
     loadJson('meta.json', MetaSchema),
     loadJson('eda.json', EdaSchema),
     loadJson('results.json', ResultsSchema),
@@ -44,7 +53,8 @@ export async function loadAllData(): Promise<AllData> {
     loadJson('params.json', ParamsSchema),
     loadJson('curves.json', CurvesSchema),
     loadJson('assumptions.json', AssumptionsSchema),
+    loadOptionalVariants(),
   ])
-  _cache = { meta, eda, results, comparison, params, curves, assumptions }
+  _cache = { meta, eda, results, comparison, params, curves, assumptions, variants }
   return _cache
 }

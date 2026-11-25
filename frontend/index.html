@@ -4,21 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Heart Disease ML & DL Replication | Simanjuntak et al. (2025)</title>
-    <meta name="description" content="Production replication and comparative benchmark of 6 machine learning and deep learning models for heart disease classification." />
-    <meta name="theme-color" content="#0A0F1C" />
-    <meta property="og:title" content="Heart Disease ML & DL Replication (JAIC 2025)" />
-    <meta property="og:description" content="Interactive reproduction and analysis of Simanjuntak et al. (2025) using 5-seed cross-validation across 6 models." />
+    <title>The Replication Notebook — Heart Disease ML & DL Study (JAIC 2025)</title>
+    <meta name="description" content="Independent 5-seed replication of Simanjuntak, Robet & Hoki (JAIC 2025) comparing Naïve Bayes, Decision Tree, Random Forest, SVM, Logistic Regression, and Deep Neural Network on 918 patients." />
+    <meta name="theme-color" content="#F3EEE4" />
+    <meta property="og:title" content="The Replication Notebook — Heart Disease ML Study" />
+    <meta property="og:description" content="A clinical lab notebook replicating Simanjuntak et al. (2025) across 5 stratified splits." />
     <meta property="og:type" content="website" />
-    <!-- Inline script to set data-theme before React renders to prevent flash -->
+    <!-- Prevent theme flash; paper light is default unless dark was chosen -->
     <script>
       (function() {
         try {
           var saved = localStorage.getItem('theme');
-          var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-          var theme = saved ? saved : (prefersLight ? 'light' : 'dark');
+          var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
           document.documentElement.setAttribute('data-theme', theme);
-        } catch (e) {}
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', theme === 'dark' ? '#12110F' : '#F3EEE4');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
       })();
     </script>
   </head>

@@ -1,80 +1,272 @@
-@import "@fontsource-variable/inter";
+/* ─── Fonts ─────────────────────────────────────────────────────────────────── */
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/instrument-sans";
 @import "@fontsource-variable/jetbrains-mono";
 
+/* ─── Tailwind ───────────────────────────────────────────────────────────────── */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Design tokens: light "paper" (default) ────────────────────────────────── */
 :root {
-  --bg: #0A0F1C;
-  --surface: #111827;
-  --elevated: #162033;
-  --border: rgba(148,163,184,.14);
-  --text: #E6EDF7;
-  --muted: #8EA0BC;
-  --teal: #2DD4BF;
-  --rose: #FB7185;
-  --slate-blue: #7FA6D6;
-  --amber: #F59E0B;
-  --success: #34D399;
-  --radius: 16px;
+  --color-bg:        #F3EEE4;
+  --color-surface:   #FBF8F2;
+  --color-ink:       #1B1A17;
+  --color-muted:     #6B655A;
+  --color-rule:      #D9D1C1;
+
+  --color-oxblood:   #B4232C;
+  --color-green:     #1F6F5C;
+  --color-ochre:     #C98A1B;
+  --color-ochre-ink: #8A5804;
+  --color-slate:     #3F5B87;
+
+  --focus-ring:      #3F5B87;
+  --grid-minor:      rgba(107, 101, 90, 0.08);
+  --grid-major:      rgba(107, 101, 90, 0.16);
 }
 
-[data-theme="light"] {
-  --bg: #F6F8FB;
-  --surface: #FFFFFF;
-  --elevated: #EEF2F7;
-  --border: rgba(15,23,42,.1);
-  --text: #0F172A;
-  --muted: #5B6B84;
+/* ─── Design tokens: dark "ward at night" ───────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg:        #12110F;
+  --color-surface:   #1A1814;
+  --color-ink:       #EFE9DD;
+  --color-muted:     #9A9186;
+  --color-rule:      #2E2B25;
+
+  --color-oxblood:   #E0545C;
+  --color-green:     #4DB89A;
+  --color-ochre:     #E3A83B;
+  --color-ochre-ink: #E3A83B;
+  --color-slate:     #8FA9D6;
+
+  --focus-ring:      #8FA9D6;
+  --grid-minor:      rgba(154, 145, 134, 0.06);
+  --grid-major:      rgba(154, 145, 134, 0.13);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* ─── Base reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
 
 html, body, #root {
   min-height: 100%;
-  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
-  background-color: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: "Instrument Sans Variable", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Typography helpers ─────────────────────────────────────────────────────── */
+.font-display {
+  font-family: "Fraunces Variable", Georgia, serif;
+  font-optical-sizing: auto;
 }
 
 .font-mono {
-  font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
   font-variant-numeric: tabular-nums;
 }
 
+/* Large display numerals */
+.numeral {
+  font-family: "Fraunces Variable", Georgia, serif;
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+  font-weight: 700;
+  line-height: 0.96;
+  letter-spacing: -0.025em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Sidenote / marginalia in italic Fraunces */
+.marginalia {
+  font-family: "Fraunces Variable", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+/* ─── Hairline rules ─────────────────────────────────────────────────────────── */
+hr { border: none; border-top: 1px solid var(--color-rule); }
+
+/* ─── Focus ──────────────────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--teal);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-/* Card glow */
-.card-glow {
-  position: relative;
-  overflow: hidden;
-}
-.card-glow::before {
-  content: '';
-  position: absolute;
-  top: -40px; left: -40px;
-  width: 180px; height: 180px;
-  background: radial-gradient(circle, rgba(45,212,191,.08) 0%, transparent 70%);
+/* ─── Paper-grain overlay (SVG feTurbulence, ~4% opacity) ───────────────────── */
+#grain-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  z-index: 0;
+  z-index: 9999;
+  opacity: 0.04;
 }
 
-/* Visually hidden for a11y */
+/* ─── Consultation sheet ECG graph-paper pattern (/predict) ──────────────────── */
+.ecg-grid-paper {
+  background-image:
+    linear-gradient(to right, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-minor) 1px, transparent 1px);
+  background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-rule); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+/* ─── Visually hidden (accessibility) ───────────────────────────────────────── */
 .sr-only {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+}
+
+/* ─── Editorial container + Tufte margin layout ──────────────────────────────── */
+.notebook-column {
+  width: min(68ch, calc(100% - 2.5rem));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.notebook-wide {
+  width: min(1040px, calc(100% - 2.5rem));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ─── Sidenote (Tufte style) ─────────────────────────────────────────────────── */
+.sidenote-anchor {
+  position: relative;
+}
+
+.sidenote-body {
+  display: none;
+  font-family: "Fraunces Variable", Georgia, serif;
+  font-style: italic;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.sidenote-body.is-open {
+  display: block;
+  margin-top: 0.65rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 2px solid var(--color-ochre);
+  background: var(--color-surface);
+}
+
+.sidenote-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-ochre-ink);
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 0.72em;
+  line-height: 1;
+  padding: 0 3px;
+  vertical-align: super;
+  border-bottom: 1px dotted var(--color-ochre-ink);
+  background: transparent;
+}
+
+@media (min-width: 1200px) {
+  .sidenote-btn {
+    display: none;
+  }
+  .sidenote-body {
+    display: block;
+    position: absolute;
+    right: -252px;
+    width: 224px;
+    top: 2px;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--color-rule);
+    background: transparent;
+  }
+  .sidenote-body.is-open {
+    margin: 0;
+    padding: 0 0 0 0.85rem;
+    border-left: 1px solid var(--color-rule);
+    background: transparent;
+  }
+}
+
+/* ─── SVG chart base styles ──────────────────────────────────────────────────── */
+.chart-axis text {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 11px;
+  fill: var(--color-muted);
+}
+.chart-axis line,
+.chart-axis path {
+  stroke: var(--color-rule);
+}
+
+/* ─── Caliper range inputs ───────────────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--color-rule);
+  border-radius: 1px;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 18px;
+  border-radius: 1px;
+  background: var(--color-ink);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-ink);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 18px;
+  border-radius: 1px;
+  background: var(--color-ink);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-ink);
+  cursor: pointer;
+}
+input[type="range"]:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ─── Smooth dot morphing for 918/184 patient grids ──────────────────────────── */
+.patient-dot {
+  transition: transform 680ms cubic-bezier(0.22, 1, 0.36, 1), fill 420ms ease, stroke 420ms ease, opacity 300ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .patient-dot {
+    transition: opacity 150ms ease;
+  }
 }

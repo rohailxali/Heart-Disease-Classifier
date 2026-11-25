@@ -12,11 +12,11 @@ _HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = _HERE.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
-def wait_for_url(url: str, timeout: int = 20):
+def wait_for_url(url: str, timeout: int = 45):
     start = time.time()
     while time.time() - start < timeout:
         try:
-            with urllib.request.urlopen(url, timeout=1) as resp:
+            with urllib.request.urlopen(url, timeout=3) as resp:
                 if resp.status == 200:
                     return True
         except Exception:
@@ -53,7 +53,7 @@ def main():
             "node",
             str(_HERE / "take_screenshots.cjs"),
             "--base-url", "http://localhost:5173",
-            "--out-dir", str(PROJECT_ROOT / "screenshots"),
+            "--out-dir", str(PROJECT_ROOT / "screenshots" / "v2"),
         ]
         res = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
         if res.returncode != 0:
