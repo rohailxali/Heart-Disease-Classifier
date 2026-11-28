@@ -14,3 +14,9 @@ screenshots/
 eda_corr.png
 eda_dist.png
 figs/
+
+# Local env overrides (never commit secrets)
+.env
+.env.local
+frontend/.env
+frontend/.env.local
